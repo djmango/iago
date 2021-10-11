@@ -1,0 +1,25 @@
+version: '3.3'
+
+services:
+    django:
+        build:
+            context: ./iago
+            dockerfile: Dockerfile
+        volumes:
+            - ./iago:/iago/
+        env_file:
+            - .env
+        restart: unless-stopped
+        ports:
+            - 5678:5678
+
+    nginx:
+        build:
+            context: ./nginx
+            dockerfile: Dockerfile
+        ports:
+            - 80:80
+        restart: unless-stopped
+        depends_on:
+            - django
+            

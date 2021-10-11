@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+    django:
+        image: iago:django-latest
+        build:
+            context: ./iago
+            dockerfile: Dockerfile
+    nginx:
+        image: iago:nginx-latest
+        build:
+              context: ./nginx
+              dockerfile: deploy.Dockerfile
