@@ -12,7 +12,9 @@ urlpatterns = [
 ]
 
 import django
+print('testingconn')
 print(django.db.connection.ensure_connection())
+print('fein')
 # this file only runs once so its a good way to do init stuff, maybe not best practice tho
 if DEBUG:
     logger.debug('oncedebug')
