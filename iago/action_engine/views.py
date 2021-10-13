@@ -44,3 +44,13 @@ class messagesForLearner(views.APIView):
                 possibles.append(row)
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)
+
+
+class aliveView(views.APIView):
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['__all__']
+    }
+
+    def get(self, request):
+        return Response('alive', status=status.HTTP_200_OK)
