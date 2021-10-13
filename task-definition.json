@@ -95,11 +95,6 @@
                     "hostPort": 80,
                     "protocol": "tcp",
                     "containerPort": 80
-                },
-                {
-                    "hostPort": 443,
-                    "protocol": "tcp",
-                    "containerPort": 443
                 }
             ],
             "command": null,

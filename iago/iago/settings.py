@@ -10,9 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,8 +29,10 @@ SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
+    logger.info('DJANGO SETTINGS IN DEBUG')
 else:
     DEBUG = False
+    logger.info('DJANGO SETTINGS IN PRODUCTION')
 
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
@@ -125,6 +130,10 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'INFO',
         },
+        # 'daphne': {
+        #     'handlers': ['console'],
+        #     'level': 'DEBUG'
+        # },
     },
 }
 
@@ -164,7 +173,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
+
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field

@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# python manage.py collectstatic --noinput --clear
+python manage.py collectstatic --noinput --clear
 if [ "$DEBUG" = "0" ]; then
     echo "RUNNING DJANGO START SCRIPT IN DEBUG"
     pip install debugpy -t /tmp
