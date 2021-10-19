@@ -1,5 +1,5 @@
 """
-permission utils and classes for metafill views
+permission utils and classes for iago views
 """
 
 from django.contrib.auth.models import Group
