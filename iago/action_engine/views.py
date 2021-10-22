@@ -33,14 +33,14 @@ class messagesForLearner(views.APIView):
 
         # get messsages from airtable
         headers = {'Authorization': 'Bearer ' + AIRTABLE_KEY}
-        r = requests.get('https://api.airtable.com/v0/app5RXbed7Bn4wO2g/Messages?', headers=headers)
+        r = requests.get('https://api.airtable.com/v0/appL382zVdInLM23F/Messages?', headers=headers)
         messages = json.loads(r.text)['records']
 
         learnerType = data['userProfile']['learner_type_option_learner_type']
         possibles = []
 
         for row in messages:
-            if learnerType in row['fields']['Learner type']:
+            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or row['fields']['Learner type'] == 'Everyone'):
                 possibles.append(row)
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)

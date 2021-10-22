@@ -15,3 +15,26 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
+    # from top2vec import Top2Vec
+    # from action_engine.models import Article
+
+    # logger.debug('loading topic training data')
+    # data = list(Article.objects.all().values_list('content', flat=True))
+    # logger.debug('topic data loaded, training')
+
+    # # model = Top2Vec(documents=data, embedding_model='universal-sentence-encoder', workers=32)
+    # model = Top2Vec(documents=data, embedding_model='doc2vec', speed='learn', workers=32)
+
+    # model.save('topicmodeldoc2vec.t2v')
+
+    # print(model)
+
+    # delete stuff
+    # from langdetect import detect
+
+    # articles = Article.objects.all()
+
+    # for article in articles:
+    #     if len(article.content) < 50 or detect(article.content) != 'en':
+    #         article.delete()
+    #         print('deleted')

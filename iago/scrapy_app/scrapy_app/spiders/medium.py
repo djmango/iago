@@ -4,6 +4,7 @@ import scrapy
 from action_engine.models import Article
 from bs4 import BeautifulSoup
 from iago.utils import clean_str
+from langdetect import detect
 
 # setup logging
 logger = logging.getLogger(__name__)
@@ -13,13 +14,12 @@ API_BASE_URL = 'http://api.scraperapi.com/'
 
 class MediumSpider(scrapy.spiders.CrawlSpider):
     name = 'medium'
-    # allowed_domains = ['*']
 
     def __init__(self, tags, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         tags = tags.split(',')
-        
+
         self.seen_urls = set(Article.objects.all().values_list('url', flat=True))
         self.start_urls = [f'https://medium.com/tag/{tag}/archive/' for tag in tags]
 
@@ -59,12 +59,6 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
             for l in links:
                 articleLink = str(l.find("a")['href']).partition('?')[0]
 
-                # params = {
-                #     'api_key': os.getenv('SCRAPERAPI_KEY'),
-                #     'url': articleLink.replace('https://', 'http://'),
-                #     'render': 'true'
-                # }
-                # articleLink = API_BASE_URL + '?' + urllib.parse.urlencode(params)
                 if articleLink not in self.seen_urls:
                     self.seen_urls.add(articleLink)
                     yield scrapy.Request(url=articleLink, callback=self.parse_article)
@@ -77,32 +71,25 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
         for l in links:
             articleLink = str(l.find("a")['href']).partition('?')[0]
 
-            # params = {
-            #         'api_key': os.getenv('SCRAPERAPI_KEY'),
-            #         'url': articleLink.replace('https://', 'http://'),
-            #         'render': 'true'
-            #     }
-            # articleLink = API_BASE_URL + '?' + urllib.parse.urlencode(params)
             if articleLink not in self.seen_urls:
                 self.seen_urls.add(articleLink)
                 yield scrapy.Request(url=articleLink, callback=self.parse_article)
 
     def parse_article(self, response):
-        """ bandcamp artist page parse """
+        """ actual article content page parse """
 
         articleSoup = BeautifulSoup(str(response.text), features='lxml')
-
-        # f = articleSoup.find_all("section", attrs={"class": "meteredContent"})
 
         item = {}
         item['url'] = response.url
 
-        if len(item['url']) <= 200: # long urls are usually chinese or cryl encoded
+        if len(item['url']) <= 800: # long urls are usually chinese or cryl encoded
             sections = articleSoup.find_all('section')
+
             story_paragraphs = []
             section_titles = []
 
-            for section in sections:
+            for section in sections: # get text content
                 paragraphs = section.find_all('p')
                 for paragraph in paragraphs:
                     story_paragraphs.append(paragraph.text)
@@ -111,12 +98,22 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
                 for sub in subs:
                     section_titles.append(sub.text)
 
+            if len(story_paragraphs) > 0:
+                item['title'] = section_titles[0] if len(section_titles) != 0 else story_paragraphs[0]
+                item['content'] = ''
+                for p in story_paragraphs:
+                    item['content'] += p + '\n'
 
-            item['title'] = section_titles[0] if len(section_titles) != 0 else story_paragraphs[0]
-            item['content'] = ''
-            for p in story_paragraphs:
-                item['content'] += p + '\n'
-                
-            item['content'] = clean_str(item['content'])
+                item['content'] = clean_str(item['content'])
 
-            yield item
+                try:
+                    if len(item['content']) < 50:
+                        logger.info(f'BOUNCED {item["title"]} for lack of content')
+                        return
+                    elif detect(item['content']) != 'en':
+                        logger.info(f'BOUNCED {item["title"]} for majority non-english content')
+                        return
+                except Exception as e:
+                    pass
+                else:
+                    yield item

@@ -130,3 +130,6 @@ dmypy.json
 
 .vscode
 iago/staticfiles/
+*.json
+*.jsonc
+semantictest

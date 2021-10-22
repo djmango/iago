@@ -1,6 +1,6 @@
 import unicodedata
 
-def clean_str(string=str()):
+def clean_str(s=str()):
     """ custom string cleaner, returns normalized unicode with spaces trimmed
 
         Args:
@@ -11,5 +11,5 @@ def clean_str(string=str()):
     """
 
     # u = unicodedata.normalize('NFC', str(string.replace('\n', '').strip()))
-    u = unicodedata.normalize('NFC', str(string.strip()))
+    u = unicodedata.normalize('NFC', str(s.strip()))
     return u
