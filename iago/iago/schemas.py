@@ -2,8 +2,14 @@ messagesForLearnerSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
-        "userProfile": {"type": "object"},
-        "courseData": {"type": "object"},
+        "userProfile": {
+            "type": "object",
+            "items": {"learner_type": "string", "user_email": "string", "user_id": "integer"}
+        },
+        "courseData": {
+            "type": "object",
+            "items": {"location": "string"}
+        },
     },
     "required": ["userProfile", "courseData"],
 }

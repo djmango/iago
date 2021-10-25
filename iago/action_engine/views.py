@@ -36,11 +36,18 @@ class messagesForLearner(views.APIView):
         r = requests.get('https://api.airtable.com/v0/appL382zVdInLM23F/Messages?', headers=headers)
         messages = json.loads(r.text)['records']
 
-        learnerType = data['userProfile']['learner_type_option_learner_type']
+        # this gets all possible unique locations to send messages from the airtable and converts to snake_case
+        locations = set([str(row['fields']['Location']).lower().replace(' ', '_') for row in messages if 'Location' in row['fields']])
+        # validate the sent location
+        if data['courseData']['location'] not in locations:
+            return Response({'status': 'error', 'response': f'location must be one of the following: {locations}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        learnerType = data['userProfile']['learner_type']
         possibles = []
 
         for row in messages:
-            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or row['fields']['Learner type'] == 'Everyone'):
+            # filter the messages so that we only get one relevant to our current position and learner type
+            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or row['fields']['Learner type'] == 'Everyone') and str(row['fields']['Location']).lower().replace(' ', '_') == data['courseData']['location']:
                 possibles.append(row)
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)

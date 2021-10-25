@@ -5,8 +5,10 @@ djangorestframework==3.12.4
 psycopg2-binary==2.8.6
 daphne==3.0.1
 whitenoise==5.3.0
-jsonschema==4.1.0 
+jsonschema==4.0.0 
 requests==2.26.0
 twisted[tls,http2]
 asgiref==3.2.10
 langdetect==1.0.9
+scrapy==2.5.1
+bs==4.10.0

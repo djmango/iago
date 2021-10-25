@@ -2,6 +2,7 @@ FROM python:3.7.3-stretch
 
 ENV DOCKERIZED=1
 ENV PYTHONBUFFERED=1
+# ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 
 WORKDIR /iago
 COPY requirements.txt requirements.txt
