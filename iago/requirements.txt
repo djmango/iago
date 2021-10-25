@@ -11,4 +11,4 @@ twisted[tls,http2]
 asgiref==3.2.10
 langdetect==1.0.9
 scrapy==2.5.1
-bs==4.10.0
+beautifulsoup4==4.10.0
