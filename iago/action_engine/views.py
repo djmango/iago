@@ -47,7 +47,7 @@ class messagesForLearner(views.APIView):
 
         for row in messages:
             # filter the messages so that we only get one relevant to our current position and learner type
-            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or row['fields']['Learner type'] == 'Everyone') and str(row['fields']['Location']).lower().replace(' ', '_') == data['courseData']['location']:
+            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or 'Everyone' in row['fields']['Learner type']) and str(row['fields']['Location']).lower().replace(' ', '_') == data['courseData']['location']:
                 possibles.append(row)
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)
