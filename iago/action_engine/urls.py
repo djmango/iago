@@ -22,10 +22,10 @@ if DEBUG:
     # data = list(Article.objects.all().values_list('content', flat=True))
     # logger.debug('topic data loaded, training')
 
-    # # model = Top2Vec(documents=data, embedding_model='universal-sentence-encoder', workers=32)
-    # model = Top2Vec(documents=data, embedding_model='doc2vec', speed='learn', workers=32)
+    # # model = Top2Vec(documents=data, embedding_model='universal-sentence-encoder', workers=8)
+    # model = Top2Vec(documents=data, embedding_model='doc2vec', speed='learn', workers=8)
 
-    # model.save('topicmodeldoc2vec.t2v')
+    # model.save('topicmodeldoc2vecBIG.t2v')
 
     # print(model)
 

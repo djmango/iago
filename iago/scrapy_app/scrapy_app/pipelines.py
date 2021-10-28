@@ -23,6 +23,7 @@ class ScrapyAppPipeline(object):
         article.title = item['title']
         article.content = item['content']
         article.url = item['url']
+        article.tags = [item['tag']] # this is fine because we are always creating a new article in this pipeline, existing ones are never sent here
         
         article.save()
         self.articles.add(article)

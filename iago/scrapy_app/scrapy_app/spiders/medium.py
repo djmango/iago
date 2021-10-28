@@ -1,4 +1,5 @@
 import logging
+import re
 
 import scrapy
 from action_engine.models import Article
@@ -57,11 +58,21 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
         else: # get articles directly from month/year whatever we got directed to
             links = list(monSoup.findAll("div", attrs={"class": "postArticle-readMore"}))
             for l in links:
+                # pull article link
                 articleLink = str(l.find("a")['href']).partition('?')[0]
+                 # get tag and if its not in the list of tags for this url then we add
+                tag = re.search(r'https:\/\/medium.com\/tag\/([^\/]+)\/archive\/', response.url).group(1)
 
                 if articleLink not in self.seen_urls:
                     self.seen_urls.add(articleLink)
                     yield scrapy.Request(url=articleLink, callback=self.parse_article)
+                else:
+                    # check if our tag is stored if not add it
+                    existingArticles = Article.objects.filter(url=articleLink)
+                    for article in existingArticles:
+                        if tag not in article.tags:
+                            article.tags.append(tag)
+                            article.save()
 
     def parse_day(self, response):
         """ get article links from days """
@@ -69,11 +80,21 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
         daySoup = BeautifulSoup(str(response.text), features='lxml')
         links = list(daySoup.findAll("div", attrs={"class": "postArticle-readMore"}))
         for l in links:
+            # pull article link
             articleLink = str(l.find("a")['href']).partition('?')[0]
+            # get tag and if its not in the list of tags for this url then we add
+            tag = re.search(r'https:\/\/medium.com\/tag\/([^\/]+)\/archive\/', response.url).group(1)
 
             if articleLink not in self.seen_urls:
                 self.seen_urls.add(articleLink)
-                yield scrapy.Request(url=articleLink, callback=self.parse_article)
+                yield scrapy.Request(url=articleLink, callback=self.parse_article, meta={'tag': tag})
+            else:
+                # check if our tag is stored if not add it
+                existingArticles = Article.objects.filter(url=articleLink)
+                for article in existingArticles:
+                    if tag not in article.tags:
+                        article.tags.append(tag)
+                        article.save()
 
     def parse_article(self, response):
         """ actual article content page parse """
@@ -82,8 +103,14 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         item = {}
         item['url'] = response.url
+        item['tag'] = response.meta.get('tag')
 
-        if len(item['url']) <= 800: # long urls are usually chinese or cryl encoded
+        # some basic filters, first we bounce if this is a members-only article
+        if "aria-label=\"Member only content\"" in str(response.text):
+            return
+
+        # bounce long urls, usually chinese or cryl encoded
+        if len(item['url']) <= 800:
             sections = articleSoup.find_all('section')
 
             story_paragraphs = []
