@@ -2,7 +2,7 @@ import logging
 import re
 
 import scrapy
-from action_engine.models import Article
+from v0.models import Article
 from bs4 import BeautifulSoup
 from iago.utils import clean_str
 from langdetect import detect

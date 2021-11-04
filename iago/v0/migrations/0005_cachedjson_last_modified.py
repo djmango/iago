@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('action_engine', '0004_cachedjson'),
+        ('v0', '0004_cachedjson'),
     ]
 
     operations = [

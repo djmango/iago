@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('action_engine', '0003_article_tags'),
+        ('v0', '0003_article_tags'),
     ]
 
     operations = [

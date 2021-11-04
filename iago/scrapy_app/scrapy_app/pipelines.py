@@ -2,7 +2,7 @@
 # https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 
 import logging
-from action_engine.models import Article
+from v0.models import Article
 from django.db import models
 
 logger = logging.getLogger(__name__)

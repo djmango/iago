@@ -15,10 +15,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-import action_engine.views
+import v0.views
 
 urlpatterns = [
-    path('alive/', action_engine.views.aliveView.as_view(), name='alive'),
+    path('alive/', v0.views.alive.as_view(), name='alive'),
     path('admin/', admin.site.urls),
-    path('action/', include('action_engine.urls')),
+    path('v0/', include('v0.urls')),
+    path('action/assistant/msgsforlearner', v0.views.messagesForLearner.as_view()) # this is just temp until minimum switches the call
 ]

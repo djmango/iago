@@ -1,21 +1,25 @@
 import json
 import os
 import threading
+from urllib.parse import urlencode
 
 import jsonschema
 import requests
 from iago.permissions import HasGroupPermission
-from iago.schemas import messagesForLearnerSchema
+from iago.schemas import messagesForLearnerSchema, articleSubmissionSchema
 from rest_framework import status, views
 from rest_framework.response import Response
-from action_engine.models import CachedJSON
+from v0.article import articleDiffbotSubmit
 
+from v0.models import CachedJSON, Content
+
+AIRTABLE_BASE = 'https://api.airtable.com/v0/'
 AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
 
 def updateCached():
     # get messsages from airtable
     headers = {'Authorization': 'Bearer ' + AIRTABLE_KEY}
-    r = requests.get('https://api.airtable.com/v0/appL382zVdInLM23F/Messages?', headers=headers)
+    r = requests.get(AIRTABLE_BASE+'appL382zVdInLM23F/Messages?', headers=headers)
 
     airtableMessages, created = CachedJSON.objects.get_or_create(key='AirtableMessages')
     airtableMessages.value = json.loads(r.text)['records']
@@ -68,8 +72,38 @@ class messagesForLearner(views.APIView):
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)
 
+class articleSubmit(views.APIView):
+    """ use diffbot to get a title from a url assuming it is an article, filtering non-english """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'POST': ['bubble']
+    }
 
-class aliveView(views.APIView):
+    def post(self, request):
+        # validate data
+        try: #TODO: make this a util method
+            data = json.loads(request.body)
+        except ValueError:
+            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            jsonschema.validate(data, schema=articleSubmissionSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        # we have now passed validation. time to fill the initial content object and pass it to the pipeline methods
+        content = Content()
+        content.url_submitted = data['url']
+        content.save()
+
+        # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured
+        # once we have decided architecture
+        threading.Thread(target=articleDiffbotSubmit, name=f'articleDiffbotSubmit_{content.id}', args=[content]).start()
+        
+        return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
+
+
+class alive(views.APIView):
     permission_classes = [HasGroupPermission]
     allowed_groups = {
         'GET': ['__all__']

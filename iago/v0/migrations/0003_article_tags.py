@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('action_engine', '0002_alter_article_url'),
+        ('v0', '0002_alter_article_url'),
     ]
 
     operations = [

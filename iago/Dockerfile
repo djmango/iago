@@ -9,6 +9,6 @@ COPY requirements.txt requirements.txt
 RUN pip install -r /iago/requirements.txt --no-cache-dir
 COPY manage.py manage.py
 COPY iago iago
-COPY action_engine action_engine
+COPY v0 v0
 COPY start.sh start.sh
 CMD ["bash", "/iago/start.sh"]

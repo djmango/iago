@@ -3,12 +3,13 @@ import logging
 from django.urls import path
 from iago.settings import DEBUG
 
-from action_engine import views
+from v0 import views
 
 logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path('assistant/msgsforlearner', views.messagesForLearner.as_view(), name='messagesforlearner'),
+    path('content/submiturl', views.articleSubmit.as_view(), name='submiturl')
 ]
 
 # this file only runs once so its a good way to do init stuff, maybe not best practice tho 
@@ -16,7 +17,7 @@ urlpatterns = [
 if DEBUG:
     logger.debug('oncedebug')
     # from top2vec import Top2Vec
-    # from action_engine.models import Article
+    # from v0.models import Article
 
     # logger.debug('loading topic training data')
     # data = list(Article.objects.all().values_list('content', flat=True))
