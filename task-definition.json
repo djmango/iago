@@ -50,6 +50,10 @@
                 {
                     "name": "AIRTABLE_KEY",
                     "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AIRTABLE_KEY::"
+                },
+                {
+                    "name": "DIFFBOT_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:DIFFBOT_KEY::"
                 }
             ],
             "dockerSecurityOptions": null,
