@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import threading
 from urllib.parse import urlencode
 
 import requests
@@ -52,6 +53,10 @@ def articleDiffbotSubmit(content: Content) -> Content:
     content.status = Content.FINISHED
     content.datetime_end = timezone.now()
     content.save()
+
+    logger.info(f'finished {content.title}')
+    threading.Thread(target=articleCallback, name=f'articleCallback_{content.id}', args=[content]).start()
+
     return content
 
 def articleCallback(content: Content) -> bool:
