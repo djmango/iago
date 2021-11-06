@@ -46,13 +46,14 @@ class Content(models.Model):
     datetime_end = models.DateTimeField(blank=True, null=True)
 
     # integrations
-    diffbot_response = models.JSONField(default=dict, blank=True, null=True) # raw response from diffbot
+    diffbot_response = models.JSONField(default=dict) # raw response from diffbot
 
     # article fields
     title = models.TextField(blank=True, null=True)
     isEnglish = models.BooleanField(blank=True, null=True)
     isArticle = models.BooleanField(blank=True, null=True)
     text = models.TextField(blank=True, null=True)
+    tags = models.JSONField(default=list)
 
     def __str__(self):
         if self.title is not None:

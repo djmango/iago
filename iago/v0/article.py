@@ -8,6 +8,7 @@ import requests
 from django.utils import timezone
 
 from v0.models import Content
+from v0.serializers import ContentSerializerWebhook
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ def articleDiffbotSubmit(content: Content) -> Content:
     # fill in our object with the details from diffbot
     content.diffbot_response = response
     content.title = response['title']
-    content.url_response = response['pageUrl']
+    # resolvedPageUrl is only there if diffbot got redirected
+    content.url_response = response['resolvedPageUrl'] if 'resolvedPageUrl' in response else response['pageUrl']
     content.isEnglish = (response['humanLanguage'] == 'en')
     content.isArticle = (response['type'] == 'article')
     content.text = response['text']
@@ -53,26 +55,9 @@ def articleDiffbotSubmit(content: Content) -> Content:
     return content
 
 def articleCallback(content: Content) -> bool:
-    """ posts data from document assosited with given ID to onder app
+    """ posts content data to content webhook """
+    payload = ContentSerializerWebhook(content).data
+    r = requests.post(str(os.getenv('CONTENT_WEBHOOK_ENDPOINT')), data=payload)
+    logger.info(f'got response from Content Webhook: HTTP {r.status_code} {r.text}')
 
-        Args:
-            id (UUID4): id of document to send to onder app
-
-        Returns:
-            bool of success
-    """
-    return False
-    # TODO: build serializer for this
-
-    # get advanced data
-    # a = dict()
-    # # send request
-    # url = str(os.getenv('WEBHOOK_ENDPOINT'))+'/api/property-documents/ml-update?='
-
-    # payload=f'id={document.id}&type={document.type}&additionalData={dict}'.encode('utf-8')
-    # headers = {
-    # 'Content-Type': 'application/x-www-form-urlencoded'
-    # }
-
-    # response = requests.request("POST", url, headers=headers, data=payload, auth=(os.getenv('WEBHOOK_USER'), os.getenv('WEBHOOK_PASS')))
-    # logger.info(f'got response fron App: HTTP {response.status_code} {response.text}')
+# TODO: do a check once an hour or so ajnd mark all content thats been processing for more than an hour as errored

@@ -16,6 +16,13 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
+
+    from v0.article import articleCallback
+    from v0.models import Content
+
+    # articleCallback(Content.objects.get(id='612a9a9f-3a32-4024-9cbd-3abcf72e298e'))
+    # https://webhook.site/#!/6e943ff0-d75f-4915-99b2-fac610096af2/b5c76679-28e4-4ea6-abfb-51ec1c9c88bd/1
+
     # from top2vec import Top2Vec
     # from v0.models import Article
 
