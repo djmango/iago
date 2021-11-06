@@ -94,10 +94,11 @@ class articleSubmit(views.APIView):
         # we have now passed validation. time to fill the initial content object and pass it to the pipeline methods
         content = Content()
         content.url_submitted = data['url']
+        if 'environment' in data: # if we have the environment specified store it, default to test
+            content.environment = Content.LIVE if data['environment'] == 'live' else Content.TEST
         content.save()
 
-        # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured
-        # once we have decided architecture
+        # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured once we have decided architecture
         threading.Thread(target=articleDiffbotSubmit, name=f'articleDiffbotSubmit_{content.id}', args=[content]).start()
         
         return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)

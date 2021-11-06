@@ -54,6 +54,18 @@
                 {
                     "name": "DIFFBOT_KEY",
                     "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:DIFFBOT_KEY::"
+                },
+                {
+                    "name": "CONTENT_WEBHOOK_ENDPOINT_TEST",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:CONTENT_WEBHOOK_ENDPOINT_TEST::"
+                },
+                {
+                    "name": "CONTENT_WEBHOOK_ENDPOINT_LIVE",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:CONTENT_WEBHOOK_ENDPOINT_LIVE::"
+                },
+                {
+                    "name": "CONTENT_WEBHOOK_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:CONTENT_WEBHOOK_KEY::"
                 }
             ],
             "dockerSecurityOptions": null,

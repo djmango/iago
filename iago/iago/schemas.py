@@ -18,7 +18,14 @@ articleSubmissionSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
-        "url": {"type": "string"}
+        "url": {
+            "type": "string",
+            "format": "uri"
+        },
+        "environment": {
+            "type": "string",
+            "enum": ["live", "test"]
+        }
     },
     "required": ["url"],
 }

@@ -47,6 +47,11 @@ class Content(models.Model):
 
     # integrations
     diffbot_response = models.JSONField(default=dict) # raw response from diffbot
+    
+    # environment
+    LIVE = 'LIVE'
+    TEST = 'TEST'
+    environment = models.CharField(max_length=15, choices=[(LIVE, 'live'), (TEST, 'test')], default=TEST)
 
     # article fields
     title = models.TextField(blank=True, null=True)
