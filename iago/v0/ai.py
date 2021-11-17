@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from sentence_transformers import SentenceTransformer
 
 import boto3
 from bertopic import BERTopic
@@ -30,7 +31,9 @@ def loadModel(model_name: str, force: bool = False) -> BERTopic:
     global topic_model
     if force or topic_model is None:
         start = time.perf_counter()
-        topic_model = BERTopic.load(model_path)
+        sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+        topic_model = BERTopic.load(model_path, embedding_model=sentence_model)
+        # topic_model = BERTopic.load(model_path)
         logger.info(f'Loaded {model_name} in {round(time.perf_counter()-start, 3)}s') # print name and time taken
 
     return topic_model
