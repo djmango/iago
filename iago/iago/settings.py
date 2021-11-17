@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
@@ -36,6 +34,8 @@ else:
 
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
+# model names
+TOPIC_MODEL_NAME = 'topic_v0.1'
 
 # Application definition
 
@@ -130,7 +130,7 @@ LOGGING = {
     'loggers': {
         '': {
             'handlers': ['console'],
-            'level': 'INFO' if not DEBUG else 'DEBUG',
+            'level': 'INFO' if not DEBUG else 'INFO', #  NORMALYL DEBUG
         },
         # 'daphne': {
         #     'handlers': ['console'],

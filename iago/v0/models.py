@@ -60,6 +60,10 @@ class Content(models.Model):
     text = models.TextField(blank=True, null=True)
     tags = models.JSONField(default=list)
 
+    # ai fields
+    topic = models.TextField(blank=True, null=True)
+    inferences = models.JSONField(default=dict) # key-value pair of model name and resulting inference
+
     def __str__(self):
         if self.title is not None:
             return str(self.title)

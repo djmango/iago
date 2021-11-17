@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path('assistant/msgsforlearner', views.messagesForLearner.as_view(), name='messagesforlearner'),
-    path('content/submiturl', views.articleSubmit.as_view(), name='submiturl')
+    path('content/submiturl', views.articleSubmit.as_view(), name='submiturl'),
+    path('content/<uuid:id>', views.content.as_view(), name='content-detail'),
 ]
 
 # this file only runs once so its a good way to do init stuff, maybe not best practice tho 
@@ -17,32 +18,37 @@ urlpatterns = [
 if DEBUG:
     logger.debug('oncedebug')
 
-    from v0.article import articleCallback
-    from v0.models import Content
+    # from bertopic import BERTopic
+    # # from v0.models import Article
+    # import hdbscan
+    # import random
+    # import json
+    # import os
+    # os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    
+    
+    # clusterer = hdbscan.HDBSCAN(min_cluster_size=10, prediction_data=True,cluster_selection_method='eom')
+    
 
-    articleCallback(Content.objects.get(id='612a9a9f-3a32-4024-9cbd-3abcf72e298e'))
-    # https://webhook.site/#!/6e943ff0-d75f-4915-99b2-fac610096af2/b5c76679-28e4-4ea6-abfb-51ec1c9c88bd/1
+    # logger.info('loading topic training data')
+    # # data = list(Article.objects.all().values_list('content', flat=True))
+    # # with open('content.json', 'w') as f:
+    # #     f.write(json.dumps(data))
+    # with open('content.json', 'r') as f:
+    #     data = json.loads(f.read())
+    # random.shuffle(data)
+    # data = data[:100000]
 
-    # from top2vec import Top2Vec
-    # from v0.models import Article
+    # logger.info(f'topic data loaded, training with {len(data)}')
 
-    # logger.debug('loading topic training data')
-    # data = list(Article.objects.all().values_list('content', flat=True))
-    # logger.debug('topic data loaded, training')
+    # # topic_model = BERTopic(verbose=True)
+    # topic_model = BERTopic(nr_topics='auto', verbose=True, calculate_probabilities=True, hdbscan_model=clusterer)
+    # topics, probs = topic_model.fit_transform(data)
+    # logger.info('done training topic SAVING')
+    # topic_model.save('topic_v0.2')
+    # with open('probs.json', 'w') as f:
+    #     f.write(json.dumps(probs))
+    # logger.info('saved')
 
-    # # model = Top2Vec(documents=data, embedding_model='universal-sentence-encoder', workers=8)
-    # model = Top2Vec(documents=data, embedding_model='doc2vec', speed='learn', workers=8)
-
-    # model.save('topicmodeldoc2vecBIG.t2v')
-
-    # print(model)
-
-    # delete stuff
-    # from langdetect import detect
-
-    # articles = Article.objects.all()
-
-    # for article in articles:
-    #     if len(article.content) < 50 or detect(article.content) != 'en':
-    #         article.delete()
-    #         print('deleted')
+# cpu is c4a.8xlarge
+# gpu is g4ad.2xlarge

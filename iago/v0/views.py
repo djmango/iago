@@ -1,7 +1,6 @@
 import json
 import os
 import threading
-from urllib.parse import urlencode
 
 import jsonschema
 import requests
@@ -9,9 +8,10 @@ from iago.permissions import HasGroupPermission
 from iago.schemas import messagesForLearnerSchema, articleSubmissionSchema
 from rest_framework import status, views
 from rest_framework.response import Response
-from v0.article import articleDiffbotSubmit
+from v0.article import articlePipeline
 
 from v0.models import CachedJSON, Content
+from v0.serializers import ContentSerializer
 
 AIRTABLE_BASE = 'https://api.airtable.com/v0/'
 AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
@@ -99,10 +99,21 @@ class articleSubmit(views.APIView):
         content.save()
 
         # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured once we have decided architecture
-        threading.Thread(target=articleDiffbotSubmit, name=f'articleDiffbotSubmit_{content.id}', args=[content]).start()
+        threading.Thread(target=articlePipeline, name=f'articlePipeline_{content.id}', args=[content]).start()
         
         return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
 
+class content(views.APIView):
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['bubble']
+    }
+
+    def get(self, request, id):
+        if Content.objects.filter(id=id).count() > 0:
+            return Response(ContentSerializer(Content.objects.get(id=id), context={'request': request}).data, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': f'{id} not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class alive(views.APIView):
     permission_classes = [HasGroupPermission]
