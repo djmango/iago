@@ -18,18 +18,17 @@ urlpatterns = [
 if DEBUG:
     logger.debug('oncedebug')
 
-    # from bertopic import BERTopic
     # # from v0.models import Article
+    # from bertopic import BERTopic
     # import hdbscan
     # import random
     # import json
     # import os
-    # os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    # os.environ["TOKENIZERS_PARALLELISM"] = "false"
     
+    # # https://github.com/MaartenGr/BERTopic/issues/65
+    # clusterer = hdbscan.HDBSCAN(min_cluster_size=50, prediction_data=True, cluster_selection_method='eom')
     
-    # clusterer = hdbscan.HDBSCAN(min_cluster_size=10, prediction_data=True,cluster_selection_method='eom')
-    
-
     # logger.info('loading topic training data')
     # # data = list(Article.objects.all().values_list('content', flat=True))
     # # with open('content.json', 'w') as f:
@@ -46,6 +45,8 @@ if DEBUG:
     # topics, probs = topic_model.fit_transform(data)
     # logger.info('done training topic SAVING')
     # topic_model.save('topic_v0.2')
+    # logger.info('saved')
+    # logger.info('saving probs')
     # with open('probs.json', 'w') as f:
     #     f.write(json.dumps(probs))
     # logger.info('saved')

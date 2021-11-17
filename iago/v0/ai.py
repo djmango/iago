@@ -48,6 +48,7 @@ def downloadModel(model_name: str, force: bool = False) -> bool:
 
     if force or not model_path.exists(): # ensure we have it downloaded
         start = time.perf_counter()
+        os.makedirs(HERE/'models', exists_ok=True)
         s3 = boto3.client('s3', aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID') , aws_secret_access_key=os.getenv('AWS_ACCESS_KEY_SECRET'))
         s3.download_file('iago-bucket', f'models/{model_name}', str(model_path))
         logger.info(f'Downloaded {model_name} in {round(time.perf_counter()-start, 3)}s') # print name and time taken
