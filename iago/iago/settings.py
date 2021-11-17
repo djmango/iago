@@ -35,7 +35,7 @@ else:
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
 # model names
-TOPIC_MODEL_NAME = 'topic_v0.1'
+TOPIC_MODEL_NAME = 'topic_v0.2'
 
 # Application definition
 

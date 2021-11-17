@@ -66,6 +66,14 @@
                 {
                     "name": "CONTENT_WEBHOOK_KEY",
                     "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:CONTENT_WEBHOOK_KEY::"
+                },
+                {
+                    "name": "AWS_ACCESS_KEY_ID",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AWS_ACCESS_KEY_ID::"
+                },
+                {
+                    "name": "AWS_ACCESS_KEY_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AWS_ACCESS_KEY_SECRET::"
                 }
             ],
             "dockerSecurityOptions": null,
