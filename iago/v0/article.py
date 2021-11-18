@@ -54,33 +54,30 @@ def articlePipeline(content: Content) -> Content:
 
     # topic analysis
     # this try is just temporary
-    try:
-        if content.isEnglish and content.isArticle: # only if english article for now
-            topic_model = ai.loadModel(TOPIC_MODEL_NAME)
-            topic_model.calculate_probabilities = True
-            inference = topic_model.transform(content.text)
+    if content.isEnglish and content.isArticle: # only if english article for now
+        topic_model = ai.loadModel(TOPIC_MODEL_NAME)
+        topic_model.calculate_probabilities = True
+        inference = topic_model.transform(content.text)
 
-            # isolate calculated probabilities and rank them
-            probabilities = inference[1][0]
-            # rank in descending order
-            probabilities_ranked = np.flip(inference[1][0][np.argsort(probabilities)])
+        # isolate calculated probabilities and rank them
+        probabilities = inference[1][0]
+        # rank in descending order
+        probabilities_ranked = np.flip(inference[1][0][np.argsort(probabilities)])
 
-            # get topic ids from probabilities by matching values to original model output
-            topic_ids = list([int(np.where(probabilities==val)[0]) for val in probabilities_ranked[:10]]) # wow hdbscan broke
+        # get topic ids from probabilities by matching values to original model output
+        topic_ids = list([int(np.where(probabilities==val)[0]) for val in probabilities_ranked[:10]]) # wow hdbscan broke
 
-            # retrieve topic data with our ids
-            inferences_nolabel = [topic_model.get_topic(id) for id in topic_ids]
-            content.topic = inferences_nolabel[0][0][0]
+        # retrieve topic data with our ids
+        inferences_nolabel = [topic_model.get_topic(id) for id in topic_ids]
+        content.topic = inferences_nolabel[0][0][0]
 
-            # structure top inference data for human analysis
-            content.inferences[TOPIC_MODEL_NAME] = []
-            for i, topic in enumerate(inferences_nolabel): # iterate through our inferences list and structure the data so that its easy for humans to analyze
-                structured_topic = {'name': topic[0][0], # highest importance scoring word in the topic
-                'probability': probabilities_ranked[i], # probablity of the topic being correct for the input text
-                'human_representation': [{'word': word[0], 'importance': word[1]} for word in topic]} # essentially just name the word-importance pairs for easy reading
-                content.inferences[TOPIC_MODEL_NAME].append(structured_topic)
-    except Exception as e:
-        logger.error(e)
+        # structure top inference data for human analysis
+        content.inferences[TOPIC_MODEL_NAME] = []
+        for i, topic in enumerate(inferences_nolabel): # iterate through our inferences list and structure the data so that its easy for humans to analyze
+            structured_topic = {'name': topic[0][0], # highest importance scoring word in the topic
+            'probability': probabilities_ranked[i], # probablity of the topic being correct for the input text
+            'human_representation': [{'word': word[0], 'importance': word[1]} for word in topic]} # essentially just name the word-importance pairs for easy reading
+            content.inferences[TOPIC_MODEL_NAME].append(structured_topic)
 
     # fin
     content.status = Content.FINISHED

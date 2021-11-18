@@ -6,9 +6,11 @@ whitenoise==5.3.0
 jsonschema
 requests==2.26.0
 twisted[tls,http2]
-# asgiref==3.2.10
 langdetect==1.0.9
 scrapy==2.5.1
 beautifulsoup4==4.10.0
 bertopic==0.9.3
-boto3==1.20.7 
+boto3==1.20.7
+# git+https://github.com/scikit-learn-contrib/hdbscan.git@1c24b8ddb787f6878ec797f5d14654e041dd352f
+# TODO: version the egg
+git+https://github.com/scikit-learn-contrib/hdbscan.git#egg=hdbscan

@@ -78,7 +78,6 @@
             ],
             "dockerSecurityOptions": null,
             "memory": 4000,
-            "memoryReservation": 800,
             "volumesFrom": null,
             "stopTimeout": null,
             "image": "237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago:django-latest",

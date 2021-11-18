@@ -31,9 +31,12 @@ def loadModel(model_name: str, force: bool = False) -> BERTopic:
     global topic_model
     if force or topic_model is None:
         start = time.perf_counter()
-        sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
-        topic_model = BERTopic.load(model_path, embedding_model=sentence_model)
-        # topic_model = BERTopic.load(model_path)
+
+        embedding_model = SentenceTransformer('all-distilroberta-v1')
+        embedding_model.max_seq_length = 512
+        logger.info(f'embedding input sequence limited at {embedding_model.max_seq_length} tokens')
+
+        topic_model = BERTopic.load(model_path, embedding_model=embedding_model)
         logger.info(f'Loaded {model_name} in {round(time.perf_counter()-start, 3)}s') # print name and time taken
 
     return topic_model
