@@ -10,4 +10,4 @@ class ContentSerializer(serializers.ModelSerializer):
 class ContentSerializerWebhook(serializers.ModelSerializer):
     class Meta:
         model = Content
-        fields = ['id', 'url_submitted', 'url_response', 'datetime_start', 'datetime_end', 'title', 'isEnglish', 'isArticle', 'text']
+        fields = ['id', 'url_submitted', 'url_response', 'datetime_start', 'datetime_end', 'title', 'isEnglish', 'isArticle', 'topic']
