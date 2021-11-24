@@ -35,7 +35,7 @@ else:
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
 # model names
-TOPIC_MODEL_NAME = 'topic_v0.6'
+TOPIC_MODEL_NAME = 'topic_v0.9'
 
 # Application definition
 
@@ -117,7 +117,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '[django] %(asctime)s %(levelname)s %(threadName)s [%(module)s:%(funcName)s:%(lineno)d] | %(message)s'
+            'format': '[%(name)s] %(asctime)s %(levelname)s %(threadName)s [%(module)s:%(funcName)s:%(lineno)d] | %(message)s'
         }
     },
     'handlers': {

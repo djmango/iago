@@ -5,10 +5,8 @@ import os
 import threading
 from urllib.parse import urlencode
 
-import numpy as np
 import requests
 from django.utils import timezone
-from iago.settings import TOPIC_MODEL_NAME
 
 import v0.ai as ai
 from v0.integration import articleWebhook
@@ -52,32 +50,10 @@ def articlePipeline(content: Content) -> Content:
     content.isArticle = (response['type'] == 'article')
     content.text = response['text']
 
-    # topic analysis
-    # this try is just temporary
+    # topic analysis and embeding
     if content.isEnglish and content.isArticle: # only if english article for now
-        topic_model = ai.loadModel(TOPIC_MODEL_NAME)
-        topic_model.calculate_probabilities = True
-        inference = topic_model.transform(content.text)
-
-        # isolate calculated probabilities and rank them
-        probabilities = inference[1][0]
-        # rank in descending order
-        probabilities_ranked = np.flip(inference[1][0][np.argsort(probabilities)])
-
-        # get topic ids from probabilities by matching values to original model output
-        topic_ids = list([int(np.where(probabilities==val)[0]) for val in probabilities_ranked[:10]]) # wow hdbscan broke
-
-        # retrieve topic data with our ids
-        inferences_nolabel = [topic_model.get_topic(id) for id in topic_ids]
-        content.topic = inferences_nolabel[0][0][0]
-
-        # structure top inference data for human analysis
-        content.inferences[TOPIC_MODEL_NAME] = []
-        for i, topic in enumerate(inferences_nolabel): # iterate through our inferences list and structure the data so that its easy for humans to analyze
-            structured_topic = {'name': topic[0][0], # highest importance scoring word in the topic
-            'probability': probabilities_ranked[i], # probablity of the topic being correct for the input text
-            'human_representation': [{'word': word[0], 'importance': word[1]} for word in topic]} # essentially just name the word-importance pairs for easy reading
-            content.inferences[TOPIC_MODEL_NAME].append(structured_topic)
+        content.topic, content.inferences[ai.topic_model.model_name] = ai.topic_model.inferenceTopic(content.text)
+        content.embeddings[ai.topic_model.embedding_model_name] = ai.topic_model.encode([content.text])[0].tolist()
 
     # fin
     content.status = Content.FINISHED

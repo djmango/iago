@@ -63,6 +63,7 @@ class Content(models.Model):
     # ai fields
     topic = models.TextField(blank=True, null=True)
     inferences = models.JSONField(default=dict) # key-value pair of model name and resulting inference
+    embeddings = models.JSONField(default=dict) # key-value pair of embedding model name and resulting embed vector
 
     def __str__(self):
         if self.title is not None:
