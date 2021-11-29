@@ -1,8 +1,11 @@
 import logging
 import uuid
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
+
+from v0.ai import embedding_model
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +66,24 @@ class Content(models.Model):
     # ai fields
     topic = models.TextField(blank=True, null=True)
     inferences = models.JSONField(default=dict) # key-value pair of model name and resulting inference
-    embeddings = models.JSONField(default=dict) # key-value pair of embedding model name and resulting embed vector
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)
 
     def __str__(self):
         if self.title is not None:
             return str(self.title)
         else:
             return str(self.id)
+
+class Topic(models.Model):
+    """ Topic object, with embedding field """
+    name = models.CharField(max_length=50, primary_key=True, editable=False)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+
+    def create(self, name: str):
+        """ Set name and generate embedding """
+        self.name = name.lower()
+        self.embedding_all_mpnet_base_v2 = list(embedding_model.encode(name))
+        return self
+
+    def __str__(self):
+        return str(self.name)
