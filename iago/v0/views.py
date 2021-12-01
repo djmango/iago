@@ -5,11 +5,10 @@ import threading
 import jsonschema
 import requests
 from iago.permissions import HasGroupPermission
-from iago import schemas
 from rest_framework import status, views
 from rest_framework.response import Response
 
-from v0 import index, utils
+from v0 import index, schemas, utils
 from v0.article import articlePipeline
 from v0.models import CachedJSON, Content, Topic
 from v0.serializers import ContentSerializer, TopicSerializerAll
@@ -97,10 +96,13 @@ class articleSubmit(views.APIView):
             content.environment = Content.LIVE if data['environment'] == 'live' else Content.TEST
         content.save()
 
-        # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured once we have decided architecture
-        threading.Thread(target=articlePipeline, name=f'articlePipeline_{content.id}', args=[content]).start()
-        
-        return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
+        if 'sync' in data and data['sync']:
+            content = articlePipeline(content)
+            return Response(ContentSerializer(content).data, status=status.HTTP_200_OK)
+        else:
+            # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured once we have decided architecture
+            threading.Thread(target=articlePipeline, name=f'articlePipeline_{content.id}', args=[content]).start()
+            return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
 
 
 class querySubmit(views.APIView):
@@ -145,7 +147,7 @@ class content(views.APIView):
 
     def get(self, request, id):
         if Content.objects.filter(id=id).count() > 0:
-            return Response(ContentSerializer(Content.objects.get(id=id), context={'request': request}).data, status=status.HTTP_200_OK)
+            return Response(ContentSerializer(Content.objects.get(id=id)).data, status=status.HTTP_200_OK)
         else:
             return Response({'error': f'{id} not found'}, status=status.HTTP_404_NOT_FOUND)
 

@@ -24,7 +24,10 @@ articleSubmissionSchema = {
         },
         "environment": {
             "type": "string",
-            "enum": ["live", "test"]
+            "enum": ["live", "test"],
+        },
+        "sync": {
+            "type": "boolean",
         }
     },
     "required": ["url"],

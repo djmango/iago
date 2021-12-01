@@ -131,7 +131,7 @@ LOGGING = {
     'loggers': {
         '': {
             'handlers': ['console'],
-            'level': 'INFO' if not DEBUG else 'INFO', #  NORMALYL DEBUG
+            'level': 'INFO' if not DEBUG else 'INFO', #  NORMALY DEBUG
         },
         # 'daphne': {
         #     'handlers': ['console'],
