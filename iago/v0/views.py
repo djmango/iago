@@ -5,13 +5,14 @@ import threading
 import jsonschema
 import requests
 from iago.permissions import HasGroupPermission
-from iago.schemas import messagesForLearnerSchema, articleSubmissionSchema
+from iago import schemas
 from rest_framework import status, views
 from rest_framework.response import Response
-from v0.article import articlePipeline
 
-from v0.models import CachedJSON, Content
-from v0.serializers import ContentSerializer
+from v0 import index, utils
+from v0.article import articlePipeline
+from v0.models import CachedJSON, Content, Topic
+from v0.serializers import ContentSerializer, TopicSerializerAll
 
 AIRTABLE_BASE = 'https://api.airtable.com/v0/'
 AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
@@ -37,14 +38,13 @@ class messagesForLearner(views.APIView):
     def post(self, request):
         """ allow update of basic fields, as of now filename type and confidence """
 
-        # validate data
-        try:
-            data = json.loads(request.body)
-        except ValueError:
+        # validate and load
+        if not utils.isValidJSON(request.body):
             return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        
+        data = json.loads(request.body)
+
         try:
-            jsonschema.validate(data, schema=messagesForLearnerSchema)
+            jsonschema.validate(data, schema=schemas.messagesForLearnerSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -73,21 +73,20 @@ class messagesForLearner(views.APIView):
         return Response({'messages': possibles}, status=status.HTTP_200_OK)
 
 class articleSubmit(views.APIView):
-    """ use diffbot to get a title from a url assuming it is an article, filtering non-english """
+    """ submit an article to the pipeline """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
         'POST': ['bubble']
     }
 
     def post(self, request):
-        # validate data
-        try: #TODO: make this a util method
-            data = json.loads(request.body)
-        except ValueError:
+        # validate and load
+        if not utils.isValidJSON(request.body):
             return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        
+        data = json.loads(request.body)
+
         try:
-            jsonschema.validate(data, schema=articleSubmissionSchema)
+            jsonschema.validate(data, schema=schemas.articleSubmissionSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -103,6 +102,41 @@ class articleSubmit(views.APIView):
         
         return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
 
+
+class querySubmit(views.APIView):
+    """ get related articles to the submitted query """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'POST': ['bubble']
+    }
+
+    def post(self, request):
+        if not utils.isValidJSON(request.body):
+            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        data = json.loads(request.body)
+
+        try:
+            jsonschema.validate(data, schema=schemas.querySubmissionSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        k = data['k'] if 'k' in data else 5
+
+        inference, vector =  index.content_index.query(data['query'], k=k)
+
+        neu_inferences = []
+        for content, probability in inference: # iterate through our inferences list and structure the data so that its easy for humans to analyze
+            structured_topic = {
+                'name': str(content), # name of the topic
+                'url': str(content.url_response), # url of the content
+                'probability': probability # probablity of the topic being correct for the input text
+            }
+            neu_inferences.append(structured_topic)
+
+        return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
+
+# model based views
+
 class content(views.APIView):
     permission_classes = [HasGroupPermission]
     allowed_groups = {
@@ -114,6 +148,47 @@ class content(views.APIView):
             return Response(ContentSerializer(Content.objects.get(id=id), context={'request': request}).data, status=status.HTTP_200_OK)
         else:
             return Response({'error': f'{id} not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Topic CRUD class views
+
+class topicList(views.APIView):
+    def get(self, request):
+        return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
+
+class topic(views.APIView):
+    """ CRUD for specified topic """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['bubble']
+    }
+
+    def get(self, request, name: str):
+        name = name.lower()
+        if Topic.objects.filter(name=name).count() > 0:
+            return Response(TopicSerializerAll(Topic.objects.get(name=name)).data, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request, name: str):
+        name = name.lower()
+        if Topic.objects.filter(name=name).count() > 0:
+            return Response({'status': 'exists', 'response': f'topic {name} already exists'}, status=status.HTTP_302_FOUND)
+        else:
+            topic = Topic()
+            topic.create(name)
+            topic.save()
+            threading.Thread(target=index.topic_index.generate_index).start()
+            return Response({'status': 'success', 'response': f'{name} created'}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, name: str):
+        name = name.lower()
+        if Topic.objects.filter(name=name).count() > 0:
+            Topic.objects.get(name=name).delete()
+            threading.Thread(target=index.topic_index.generate_index).start()
+            return Response({'status': 'success', 'response': f'{name} deleted'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
 class alive(views.APIView):
     permission_classes = [HasGroupPermission]

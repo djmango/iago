@@ -4,7 +4,7 @@ import re
 import scrapy
 from v0.models import Article
 from bs4 import BeautifulSoup
-from iago.utils import clean_str
+from v0.utils import clean_str
 from langdetect import detect
 
 # setup logging

@@ -53,19 +53,17 @@ def articlePipeline(content: Content) -> Content:
 
     # topic analysis and embeding
     if content.isEnglish and content.isArticle: # only if english article for now
-        inference = index.topic_inference.query(content.text, k=5) # TODO: technically we encode this twice, once in the index and the second time below for storage, should fix that
+        inference, embedding = index.topic_index.query(content.text, k=5)
+        content.embedding_all_mpnet_base_v2 = embedding.tolist()
         content.topic = str(inference[0][0])
-        content.inferences[ai.EMBEDDING_MODEL_NAME] = inference
 
         content.inferences[ai.EMBEDDING_MODEL_NAME] = []
         for topic, probability in inference: # iterate through our inferences list and structure the data so that its easy for humans to analyze
             structured_topic = {
-                'name': topic, # highest importance scoring word in the topic
+                'name': str(topic), # name of the topic
                 'probability': probability # probablity of the topic being correct for the input text
             }
             content.inferences[ai.EMBEDDING_MODEL_NAME].append(structured_topic)
-
-        content.embedding_all_mpnet_base_v2 = ai.embedding_model.encode([content.text])[0].tolist()
 
     # fin
     content.status = Content.FINISHED
@@ -75,5 +73,6 @@ def articlePipeline(content: Content) -> Content:
     elapsed = divmod((content.datetime_end - content.datetime_start).total_seconds(), 60) # get tuple of mins and secs elapsed
     logger.info(f'finished {content.title} in {round(elapsed[0])}m {round(elapsed[1], 2)}s')
     threading.Thread(target=articleWebhook, name=f'articleWebhook_{content.id}', args=[content]).start()
+    threading.Thread(target=index.content_index.generate_index).start()
 
     return content

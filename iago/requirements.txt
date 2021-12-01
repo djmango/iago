@@ -12,6 +12,5 @@ beautifulsoup4==4.10.0
 bertopic==0.9.3
 boto3==1.20.7
 faiss-cpu==1.7.1.post2 
+drf-yasg==1.20.0 
 git+https://github.com/scikit-learn-contrib/hdbscan.git@1c24b8ddb787f6878ec797f5d14654e041dd352f
-# TODO: version the egg
-# git+https://github.com/scikit-learn-contrib/hdbscan.git#egg=hdbscan
