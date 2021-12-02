@@ -16,6 +16,7 @@ from v0.serializers import ContentSerializer, TopicSerializerAll
 AIRTABLE_BASE = 'https://api.airtable.com/v0/'
 AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
 
+
 def updateCached():
     # get messsages from airtable
     headers = {'Authorization': 'Bearer ' + AIRTABLE_KEY}
@@ -26,6 +27,7 @@ def updateCached():
     airtableMessages.save()
 
     return {'AirtableMessages': airtableMessages.value}
+
 
 class messagesForLearner(views.APIView):
     """ take user profile and course data and return applicable messsages """
@@ -51,9 +53,9 @@ class messagesForLearner(views.APIView):
         messages, created = CachedJSON.objects.get_or_create(key='AirtableMessages')
         if created:
             messages = updateCached()['AirtableMessages']
-        else: # no need to wait for airtable if we already have a cached version
+        else:  # no need to wait for airtable if we already have a cached version
             threading.Thread(target=updateCached, name='updateCached').start()
-            messages = messages.value # since before we stored the whole object in this var
+            messages = messages.value  # since before we stored the whole object in this var
 
         # this gets all possible unique locations to send messages from the airtable and converts to snake_case
         locations = set([str(row['fields']['Location']).lower().replace(' ', '_') for row in messages if 'Location' in row['fields']])
@@ -70,6 +72,7 @@ class messagesForLearner(views.APIView):
                 possibles.append(row)
 
         return Response({'messages': possibles}, status=status.HTTP_200_OK)
+
 
 class articleSubmit(views.APIView):
     """ submit an article to the pipeline """
@@ -92,7 +95,7 @@ class articleSubmit(views.APIView):
         # we have now passed validation. time to fill the initial content object and pass it to the pipeline methods
         content = Content()
         content.url_submitted = data['url']
-        if 'environment' in data: # if we have the environment specified store it, default to test
+        if 'environment' in data:  # if we have the environment specified store it, default to test
             content.environment = Content.LIVE if data['environment'] == 'live' else Content.TEST
         content.save()
 
@@ -124,20 +127,21 @@ class querySubmit(views.APIView):
 
         k = data['k'] if 'k' in data else 5
 
-        inference, vector =  index.content_index.query(data['query'], k=k)
+        inference, vector = index.content_index.query(data['query'], k=k)
 
         neu_inferences = []
-        for content, probability in inference: # iterate through our inferences list and structure the data so that its easy for humans to analyze
+        for content, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
             structured_topic = {
-                'name': str(content), # name of the topic
-                'url': str(content.url_response), # url of the content
-                'probability': probability # probablity of the topic being correct for the input text
+                'name': str(content),  # name of the topic
+                'url': str(content.url_response),  # url of the content
+                'probability': probability  # probablity of the topic being correct for the input text
             }
             neu_inferences.append(structured_topic)
 
         return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
 
 # model based views
+
 
 class content(views.APIView):
     permission_classes = [HasGroupPermission]
@@ -157,6 +161,7 @@ class content(views.APIView):
 class topicList(views.APIView):
     def get(self, request):
         return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
+
 
 class topic(views.APIView):
     """ CRUD for specified topic """
@@ -191,6 +196,7 @@ class topic(views.APIView):
             return Response({'status': 'success', 'response': f'{name} deleted'}, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
+
 
 class alive(views.APIView):
     permission_classes = [HasGroupPermission]

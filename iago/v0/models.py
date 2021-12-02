@@ -82,7 +82,7 @@ class Topic(models.Model):
     def create(self, name: str):
         """ Set name and generate embedding """
         self.name = name.lower()
-        self.embedding_all_mpnet_base_v2 = list(embedding_model.encode(name))
+        self.embedding_all_mpnet_base_v2 = list(embedding_model.model.encode(name))
         return self
 
     def __str__(self):

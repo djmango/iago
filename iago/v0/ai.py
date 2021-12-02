@@ -8,9 +8,20 @@ from sentence_transformers import SentenceTransformer
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL_NAME = 'all-mpnet-base-v2'
+os.makedirs(HERE/'models', exist_ok=True)
+
+class Model():
+    """ simple handler for sentence_transformers models """
+    def __init__(self, name: str, max_seq_length: int = 384):
+        self.name = name
+        self.max_seq_length = max_seq_length
+        self.model: SentenceTransformer
+        self.load()
+
+    def load(self):
+        """ loads model """
+        self.model = SentenceTransformer(self.name, cache_folder=HERE/'models', device='cpu') # keeping on cpu for now since we dont batch
+        self.model.max_seq_length = self.max_seq_length
 
 # define embedding model
-os.makedirs(HERE/'models', exist_ok=True)
-embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME, cache_folder=HERE/'models')
-embedding_model.max_seq_length = 384
+embedding_model = Model('all-mpnet-base-v2')

@@ -50,6 +50,8 @@ def articlePipeline(content: Content) -> Content:
     content.isEnglish = (response['humanLanguage'] == 'en')
     content.isArticle = (response['type'] == 'article')
     content.text = response['text']
+    if 'tags' in response:
+        content.tags = [tag['label'] for tag in response['tags']]
 
     # topic analysis and embeding
     if content.isEnglish and content.isArticle: # only if english article for now
@@ -57,13 +59,13 @@ def articlePipeline(content: Content) -> Content:
         content.embedding_all_mpnet_base_v2 = embedding.tolist()
         content.topic = str(inference[0][0])
 
-        content.inferences[ai.EMBEDDING_MODEL_NAME] = []
+        content.inferences[ai.embedding_model.name] = []
         for topic, probability in inference: # iterate through our inferences list and structure the data so that its easy for humans to analyze
             structured_topic = {
                 'name': str(topic), # name of the topic
                 'probability': probability # probablity of the topic being correct for the input text
             }
-            content.inferences[ai.EMBEDDING_MODEL_NAME].append(structured_topic)
+            content.inferences[ai.embedding_model.name].append(structured_topic)
 
     # fin
     content.status = Content.FINISHED

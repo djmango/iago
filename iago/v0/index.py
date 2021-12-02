@@ -15,7 +15,7 @@ class QuerysetVectorIndex():
     """ Queryset inference class for using existing embeddings and implementing vector search, and other methods """
 
     def __init__(self, queryset):
-        self.embedding_model = embedding_model
+        self.embedding_model = embedding_model.model
         self.queryset = queryset
         self.logger = logging.getLogger(f'QuerysetVectorIndex_{self.queryset.model.__name__}')
         self.generate_index()
