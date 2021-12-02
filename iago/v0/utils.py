@@ -1,6 +1,7 @@
 import json
 import unicodedata
 
+
 def clean_str(s: str):
     """ custom string cleaner, returns normalized unicode with spaces trimmed
 
@@ -10,10 +11,20 @@ def clean_str(s: str):
         Returns:
             string(str): normalized unicode string with spaces trimmed
     """
+    return unicodedata.normalize('NFC', str(s.strip()))
 
-    # u = unicodedata.normalize('NFC', str(string.replace('\n', '').strip()))
-    u = unicodedata.normalize('NFC', str(s.strip()))
-    return u
+
+def words_in(s: str):
+    """ counts space seperated words in string
+
+    Args:
+        s (str): string to count words of
+
+    Returns:
+        int: number of words in s split my spaces
+    """
+    return len(s.split(' '))
+
 
 def isValidJSON(s: str):
     """ returns false if s is not a valid JSON string, else returns s as a json object
@@ -24,7 +35,8 @@ def isValidJSON(s: str):
     Returns:
         False if s is not a valid JSON string, else returns s as a json object
     """
-    try: 
+    try:
+        json.loads(s)
         return True
     except ValueError:
         return False

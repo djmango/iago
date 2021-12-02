@@ -12,7 +12,7 @@ os.makedirs(HERE/'models', exist_ok=True)
 
 class Model():
     """ simple handler for sentence_transformers models """
-    def __init__(self, name: str, max_seq_length: int = 384):
+    def __init__(self, name: str, max_seq_length: int):
         self.name = name
         self.max_seq_length = max_seq_length
         self.model: SentenceTransformer
@@ -24,4 +24,5 @@ class Model():
         self.model.max_seq_length = self.max_seq_length
 
 # define embedding model
-embedding_model = Model('all-mpnet-base-v2')
+embedding_model = Model('all-mpnet-base-v2', max_seq_length=384)
+# embedding_qa_model = Model('multi-qa-mpnet-base-dot-v1', max_seq_length=512)

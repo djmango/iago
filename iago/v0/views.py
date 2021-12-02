@@ -125,18 +125,49 @@ class querySubmit(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
+        query = data['query']
         k = data['k'] if 'k' in data else 5
 
-        inference, vector = index.content_index.query(data['query'], k=k)
+        if 'text' not in data: # query our database of content
+            inference, vector = index.content_index.query(query, k=k)
 
-        neu_inferences = []
-        for content, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
-            structured_topic = {
-                'name': str(content),  # name of the topic
-                'url': str(content.url_response),  # url of the content
-                'probability': probability  # probablity of the topic being correct for the input text
-            }
-            neu_inferences.append(structured_topic)
+            # format for humans
+            neu_inferences = []
+            for content, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
+                structured_topic = {
+                    'name': str(content),  # title of the content
+                    'url': str(content.url_response),  # url of the content
+                    'probability': probability  # probablity of the inference being correct 
+                }
+                neu_inferences.append(structured_topic)
+
+        else:  # query the provided text
+            # texts = ['']
+            # i = 0
+            # for word in data['text'].split('. '):
+            #     # bump to next text boundary if we are above 50 words
+            #     if utils.words_in(texts[i]) > 50:
+            #         texts[i] = texts[i].strip()
+            #         i += 1
+            #         texts.append('')
+            #     # concat to current segment
+            #     texts[i] += str(word) + ' '
+
+            # we will just split by sentences for now
+            texts = data['text'].split('. ')
+
+            # encode
+            request_index = index.VectorIndex(texts)
+            inference, vector = request_index.query(query, k=k)
+
+            # format for humans
+            neu_inferences = []
+            for snippet, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
+                structured_topic = {
+                    'snippet': snippet,  # snippet that was matched
+                    'probability': probability  # probablity of the inference being correct
+                }
+                neu_inferences.append(structured_topic)
 
         return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
 

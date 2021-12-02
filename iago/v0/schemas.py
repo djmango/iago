@@ -40,6 +40,9 @@ querySubmissionSchema = {
         "query": {
             "type": "string",
         },
+        "text": {
+            "type": "string",
+        },
         "k": {
             "type": "integer"
         }
