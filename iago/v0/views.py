@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import threading
 
 import jsonschema
@@ -154,7 +155,8 @@ class querySubmit(views.APIView):
             #     texts[i] += str(word) + ' '
 
             # we will just split by sentences for now
-            texts = data['text'].split('. ')
+            # texts = data['text'].split('. ')
+            texts = [str(s) for s in re.split(r"(?<!^)\s*[.\n]+\s*(?!$)", data['text'])]
 
             # encode
             request_index = index.VectorIndex(texts)

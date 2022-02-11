@@ -2,7 +2,6 @@ import logging
 
 from django.urls import path
 from iago.settings import DEBUG
-
 from v0 import views
 
 logger = logging.getLogger(__name__)
@@ -20,8 +19,3 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
-
-    # from v0.index import content_index
-
-    # res, emb = content_index.query('where is the biggest mouse?', k=5)
-    # print(res)
