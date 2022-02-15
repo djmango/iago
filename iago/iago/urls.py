@@ -13,9 +13,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.conf.urls import url
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 import v0.views
 
 from rest_framework import permissions
@@ -33,7 +32,7 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    url(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('alive/', v0.views.alive.as_view(), name='alive'),
     path('admin/', admin.site.urls),
     path('v0/', include('v0.urls')),

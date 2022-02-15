@@ -8,7 +8,7 @@ import numpy as np
 from django.db.models.query import QuerySet
 
 from v0.ai import embedding_model
-from v0.models import Content, Topic
+from v0.models import Content, Topic, Skill
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -59,6 +59,24 @@ class VectorIndex():
         results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], indices.tolist()[0])]  # 0 because query_vector is a list of 1 element
         return results, query_vector
 
+    def query_vector(self, query_vector: np.ndarray, k: int = 1):
+        """ Find closest k matches for a given index, assumes vector is of same embedding model as the index
+
+        Args:
+            vector (ndarray): The vector to find closest matches for
+            k (int, optional): Number of results to return. Defaults to 1.
+
+        Returns:
+            results list(Tuple(Topic_id, similarity)): List of tuples, object from self.queryset and its similarity to the query_vector, in descending order
+        """
+
+        query_vector = np.array([query_vector]).astype(np.float32)
+        values, indices = self.index.search(query_vector, k)
+
+        results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], indices.tolist()[0])]  # 0 because query_vector is a list of 1 element
+        return results
+
 
 topic_index = VectorIndex(Topic.objects.all())
 content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+skills_index = VectorIndex(Skill.objects.all())

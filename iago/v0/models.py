@@ -87,3 +87,20 @@ class Topic(models.Model):
 
     def __str__(self):
         return str(self.name)
+
+
+
+class Job(models.Model):
+    name = models.CharField(max_length=255, primary_key=True, editable=False)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+
+    def __str__(self):
+        return str(self.name)
+
+
+class Skill(models.Model):
+    name = models.CharField(max_length=255, primary_key=True, editable=False)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+
+    def __str__(self):
+        return str(self.name)

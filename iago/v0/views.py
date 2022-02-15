@@ -1,21 +1,27 @@
 import json
+import logging
 import os
 import re
 import threading
+import time
 
 import jsonschema
+import numpy as np
 import requests
+from django.contrib.postgres.search import TrigramSimilarity
 from iago.permissions import HasGroupPermission
 from rest_framework import status, views
 from rest_framework.response import Response
 
 from v0 import index, schemas, utils
 from v0.article import articlePipeline
-from v0.models import CachedJSON, Content, Topic
+from v0.models import CachedJSON, Content, Job, Topic
 from v0.serializers import ContentSerializer, TopicSerializerAll
 
 AIRTABLE_BASE = 'https://api.airtable.com/v0/'
 AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
+
+logger = logging.getLogger(__name__)
 
 
 def updateCached():
@@ -129,7 +135,7 @@ class querySubmit(views.APIView):
         query = data['query']
         k = data['k'] if 'k' in data else 5
 
-        if 'text' not in data: # query our database of content
+        if 'text' not in data:  # query our database of content
             inference, vector = index.content_index.query(query, k=k)
 
             # format for humans
@@ -138,7 +144,7 @@ class querySubmit(views.APIView):
                 structured_topic = {
                     'name': str(content),  # title of the content
                     'url': str(content.url_response),  # url of the content
-                    'probability': probability  # probablity of the inference being correct 
+                    'probability': probability  # probablity of the inference being correct
                 }
                 neu_inferences.append(structured_topic)
 
@@ -172,6 +178,42 @@ class querySubmit(views.APIView):
                 neu_inferences.append(structured_topic)
 
         return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
+
+
+class jobSkillMatch(views.APIView):
+    """ take a job title string and return matching skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'POST': ['bubble']
+    }
+
+    def post(self, request):
+        if not utils.isValidJSON(request.body):
+            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        data = json.loads(request.body)
+
+        try:
+            jsonschema.validate(data, schema=schemas.jobSkillMatchSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        start = time.perf_counter()
+        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', data['jobtitle'])).filter(similarity__gt=0.5).order_by('-similarity')
+        job: Job = jobs.first()
+        logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
+        
+        if job is None: # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
+            return Response({'skills': []}, status=status.HTTP_200_OK)
+        k = data['k'] if 'k' in data else 7
+
+        # search index
+        start = time.perf_counter()
+        results = index.skills_index.query_vector(np.array(job.embedding_all_mpnet_base_v2), k)
+        skills = [str(result[0].name) for result in results]
+        logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
+
+        return Response({'jobtitle': str(job.name), 'skills': skills}, status=status.HTTP_200_OK)
+
 
 # model based views
 

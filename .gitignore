@@ -134,3 +134,6 @@ iago/staticfiles/
 *.jsonc
 test
 models/
+*.csv
+*.txt
+.DS_Store
