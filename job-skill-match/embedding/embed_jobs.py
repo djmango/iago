@@ -25,10 +25,6 @@ print(f'Model load took {round(time.perf_counter() - start, 2)}s')
 embeddings = model.encode(jobslist, show_progress_bar=True)
 print(f'Embed took {round(time.perf_counter() - start, 2)}s')
 
-# save locally
-pd.DataFrame(list(zip(jobslist, embeddings)), columns=['Jobtitle', 'Embedding']).to_csv(HERE/'jobstitles_embedded.csv')
-print('Written locally')
-
 # insert records
 values = [Jobs(jobtitle=jobtitle, embedding=embedding.tolist()) for jobtitle, embedding in zip(jobslist, embeddings)]
 db.session.add_all(values)

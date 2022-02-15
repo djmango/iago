@@ -137,3 +137,4 @@ models/
 *.csv
 *.txt
 .DS_Store
+*.tsv

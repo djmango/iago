@@ -198,7 +198,7 @@ class jobSkillMatch(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         start = time.perf_counter()
-        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', data['jobtitle'])).filter(similarity__gt=0.5).order_by('-similarity')
+        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', data['jobtitle'])).filter(similarity__gt=0.3).order_by('-similarity')
         job: Job = jobs.first()
         logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
         
