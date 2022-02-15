@@ -11,7 +11,7 @@ urlpatterns = [
     path('content/submiturl', views.articleSubmit.as_view(), name='submiturl'),
     path('content/<uuid:id>', views.content.as_view(), name='content-detail'),
     path('content/query', views.querySubmit.as_view()),
-    path('content/jobskillmatch', views.jobSkillMatch.as_view()),
+    path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('topics/', views.topicList.as_view()),
     path('topics/<str:name>', views.topic.as_view()),
 ]
