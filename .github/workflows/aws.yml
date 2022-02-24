@@ -41,13 +41,11 @@ jobs:
       run: |
         # Build a docker container and push it to ECR so that it can be deployed to ECS.
         docker-compose -f docker-compose.deploy.yml build
-        docker build -t $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:latest
+        docker build -t $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:$IMAGE_TAG ./iago-serverless-transformer
         docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
-        docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO_IAGO:django-latest
         docker tag iago:nginx-latest $ECR_REGISTRY/$ECR_REPO_IAGO:nginx-latest
         docker push $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:latest
-        docker push $ECR_REGISTRY/$ECR_REPO_IAGO:django-latest
+        docker push $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPO_IAGO:nginx-latest
         echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG"
 
@@ -57,8 +55,7 @@ jobs:
       with:
         task-definition: task-definition.json
         container-name: iago-django
-        image: 237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago:django-latest
-        # image: ${{ steps.build-image.outputs.image }}
+        image: ${{ steps.build-image.outputs.image }}
 
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
