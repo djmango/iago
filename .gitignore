@@ -134,8 +134,8 @@ iago/staticfiles/
 *.jsonc
 test
 iago/v0/models/
+job-skill-match/embedding/jobs/csv/
 *.csv
-*.txt
 .DS_Store
 *.tsv
 all-mpnet-base-v2/
