@@ -10,7 +10,7 @@ from v0.ai import embedding_model
 logger = logging.getLogger(__name__)
 
 
-class Article(models.Model): # this is the scraped article, not our internal content representation
+class Article(models.Model):  # this is the scraped article, not our internal content representation
     title = models.TextField()
     content = models.TextField()
     url = models.URLField(max_length=800)
@@ -22,6 +22,7 @@ class Article(models.Model): # this is the scraped article, not our internal con
     class Meta:
         db_table = 'articles'
 
+
 class CachedJSON(models.Model):
     key = models.CharField(max_length=100, primary_key=True)
     value = models.JSONField(default=dict)
@@ -29,6 +30,7 @@ class CachedJSON(models.Model):
 
     class Meta:
         db_table = 'cachedjson'
+
 
 class Content(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -49,8 +51,8 @@ class Content(models.Model):
     datetime_end = models.DateTimeField(blank=True, null=True)
 
     # integrations
-    diffbot_response = models.JSONField(default=dict) # raw response from diffbot
-    
+    diffbot_response = models.JSONField(default=dict)  # raw response from diffbot
+
     # environment
     LIVE = 'LIVE'
     TEST = 'TEST'
@@ -65,7 +67,7 @@ class Content(models.Model):
 
     # ai fields
     topic = models.TextField(blank=True, null=True)
-    inferences = models.JSONField(default=dict) # key-value pair of model name and resulting inference
+    inferences = models.JSONField(default=dict)  # key-value pair of model name and resulting inference
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)
 
     def __str__(self):
@@ -73,6 +75,7 @@ class Content(models.Model):
             return str(self.title)
         else:
             return str(self.id)
+
 
 class Topic(models.Model):
     """ Topic object, with embedding field """
@@ -87,7 +90,6 @@ class Topic(models.Model):
 
     def __str__(self):
         return str(self.name)
-
 
 
 class Job(models.Model):

@@ -53,6 +53,9 @@ INSTALLED_APPS = [
     'drf_yasg',
 ]
 
+if DEBUG:
+    INSTALLED_APPS.append('django_extensions')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -91,6 +94,12 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ]
+}
+
+# extensions
+GRAPH_MODELS = {
+  'all_applications': True,
+  'group_models': True,
 }
 
 # Database

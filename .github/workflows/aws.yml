@@ -35,18 +35,21 @@ jobs:
       id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPO: iago
+        ECR_REPO_IAGO: iago
+        ECR_REPO_IAGO_SERVERLESS: iago-serverless-transformer
         IMAGE_TAG: ${{ github.sha }}
       run: |
         # Build a docker container and push it to ECR so that it can be deployed to ECS.
         docker-compose -f docker-compose.deploy.yml build
-        docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-        docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO:django-latest
-        docker tag iago:nginx-latest $ECR_REGISTRY/$ECR_REPO:nginx-latest
-        docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPO:django-latest
-        docker push $ECR_REGISTRY/$ECR_REPO:nginx-latest
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPO_HERMES:$IMAGE_TAG"
+        docker build -t $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:latest
+        docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
+        docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO_IAGO:django-latest
+        docker tag iago:nginx-latest $ECR_REGISTRY/$ECR_REPO_IAGO:nginx-latest
+        docker push $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:latest
+        docker push $ECR_REGISTRY/$ECR_REPO_IAGO:django-latest
+        docker push $ECR_REGISTRY/$ECR_REPO_IAGO:nginx-latest
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG"
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def

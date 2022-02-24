@@ -133,8 +133,9 @@ iago/staticfiles/
 *.json
 *.jsonc
 test
-models/
+iago/v0/models/
 *.csv
 *.txt
 .DS_Store
 *.tsv
+all-mpnet-base-v2/

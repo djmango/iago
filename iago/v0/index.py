@@ -6,9 +6,10 @@ from typing import Iterable
 import faiss
 import numpy as np
 from django.db.models.query import QuerySet
+from iago.settings import DEBUG
 
 from v0.ai import embedding_model
-from v0.models import Content, Topic, Skill
+from v0.models import Content, Skill, Topic
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -76,7 +77,10 @@ class VectorIndex():
         results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], indices.tolist()[0])]  # 0 because query_vector is a list of 1 element
         return results
 
-
-topic_index = VectorIndex(Topic.objects.all())
-content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
-skills_index = VectorIndex(Skill.objects.all())
+topic_index: VectorIndex
+content_index: VectorIndex
+skills_index: VectorIndex
+if not DEBUG or False: # set to true to enable indexes in debug
+    topic_index = VectorIndex(Topic.objects.all())
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+    skills_index = VectorIndex(Skill.objects.all())
