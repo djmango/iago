@@ -4,7 +4,7 @@ Sentence Encoding using Sentence Transformers on AWS Lambda. Check root readme f
 
 ## Request format
 
-```
+```json
 {
     "texts": ['This framework generates embeddings for each input sentence',
              'Sentences are passed as a list of string.',
@@ -15,7 +15,7 @@ Sentence Encoding using Sentence Transformers on AWS Lambda. Check root readme f
 
 ## Response format
 
-```
+```json
 # returns a list of the shape (348,) for each sentence
 
 {
