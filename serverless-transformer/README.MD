@@ -6,10 +6,10 @@ Sentence Encoding using Sentence Transformers on AWS Lambda. See <https://github
 
 ```json
 {
-    "texts": ['This framework generates embeddings for each input sentence',
-             'Sentences are passed as a list of string.',
-             'The quick brown fox jumps over the lazy dog.'],
-    "model_name":'paraphrase-MiniLM-L6-v2' (optional)    
+    "texts": ["This framework generates embeddings for each input sentence",
+             "Sentences are passed as a list of string.",
+             "The quick brown fox jumps over the lazy dog."],
+    "model_name":"paraphrase-MiniLM-L6-v2" (optional)    
 }
 ```
 

@@ -20,7 +20,7 @@ jobs:
         ref: ${{ github.ref }}
     - name: Build container
       run: |
-        docker build --tag iago-serverless-transformer:latest .
+        docker buildx build --platform linux/arm64 --tag iago-serverless-transformer:latest .
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
