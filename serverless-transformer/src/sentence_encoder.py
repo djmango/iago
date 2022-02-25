@@ -1,18 +1,20 @@
+import json
 import warnings
-
-warnings.filterwarnings("ignore")
-
 from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
 
 from src import config, utils
 
+warnings.filterwarnings("ignore")
+
+
 logger = utils.create_logger(project_name=config.PREDICTION_TYPE, level="INFO")
+
 
 class SentenceEncoder:
     def __init__(self):
-        _ = self.get_sent_encoder(model_name=config.DEFAULT_MODEL_NAME) #warm up
+        _ = self.get_sent_encoder(model_name=config.DEFAULT_MODEL_NAME)  # warm up
 
     @staticmethod
     @lru_cache(maxsize=config.CACHE_MAXSIZE)
@@ -37,20 +39,20 @@ class SentenceEncoder:
 
         Returns:
             str: clean text
-        """        
+        """
         return text.strip().lower()
 
-    def __call__(self, request: dict)-> dict:
+    def __call__(self, request: dict) -> dict:
         """ embeddings of the given list of sentences
-        
+
         Args:
             request (dict): request containing the list of snetences for encoding
-        
+
         Returns:
             dict: list of embeddings for each sentence embedding dimension = (384,)
         """
         texts = [self.get_clean_text(text) for text in request["texts"]]
-        
+
         logger.info(f"Generating embeddings for {len(texts)} sentences")
 
         model_name = request.get('model_name', config.DEFAULT_MODEL_NAME)
@@ -58,9 +60,7 @@ class SentenceEncoder:
         sentence_encoder = self.get_sent_encoder(model_name)
 
         embeddings = sentence_encoder.encode(texts)
-        
-        return {
-            "vectors": embeddings
-        }
 
-    
+        return {
+            "vectors": embeddings.tolist()
+        }

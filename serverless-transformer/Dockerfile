@@ -1,4 +1,4 @@
-FROM amazon/aws-lambda-python
+FROM public.ecr.aws/lambda/python:3.8
 
 ARG MODEL_DIR=./models
 
@@ -9,14 +9,14 @@ ENV TRANSFORMERS_VERBOSITY=error
 RUN yum -y install gcc-c++
 
 COPY requirements.txt requirements.txt
-RUN pip install torch==1.8+cpu -f https://download.pytorch.org/whl/torch_stable.html --no-cache-dir
+# RUN pip install torch==1.8+cpu -f https://download.pytorch.org/whl/torch_stable.html --no-cache-dir
 RUN pip install -r requirements.txt --no-cache-dir
 
-COPY ./ ./
+COPY ./ ${LAMBDA_TASK_ROOT}
 
 # Run test cases and this saves the transformer model in the container
 RUN pip install pytest --no-cache-dir && pytest tests -s -vv
 
 RUN chmod -R 0777 $MODEL_DIR
 
-CMD [ "main.lambda_handler"]
+CMD ["main.lambda_handler"]
