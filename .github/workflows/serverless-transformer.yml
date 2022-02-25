@@ -1,4 +1,4 @@
-name: serverless-transformer
+name: Serverless Transformer
 
 on:
   push:

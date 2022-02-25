@@ -1,6 +1,6 @@
-## Sentence Encoding service
+# Sentence Encoding service
 
-Sentence Encoding using Sentence Transformers on AWS Lambda. Check root readme for complete setup info.
+Sentence Encoding using Sentence Transformers on AWS Lambda. See <https://github.com/bhavsarpratik/serverless-transformers-on-aws-lambda>
 
 ## Request format
 
