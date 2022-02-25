@@ -1,0 +1,39 @@
+name: serverless-transformer
+
+on:
+  pull_request: 
+    branches:
+      - master
+    paths:
+      - "serverless-transformer/**"
+
+jobs:
+  serverless-transformer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./serverless-transformer
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ github.ref }}
+    - name: Build container
+      run: |
+        docker build --tag iago-serverless-transformer:latest .
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-central-1
+    - name: Push to ECR
+      id: ecr
+      uses: jwalton/gh-ecr-push@v1
+      with:
+        access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        region: eu-central-1
+        image: iago-serverless-transformer:latest
+    - name: Update Lambda with image
+      run: aws lambda update-function-code --function-name iago-serverless-transformer --image-uri 237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago-serverless-transformer:latest

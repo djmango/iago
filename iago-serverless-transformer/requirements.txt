@@ -1,2 +1,0 @@
-https://download.pytorch.org/whl/cpu/torch-1.10.2-cp39-cp39-manylinux2014_aarch64.whl
-transformers==4.16.2
