@@ -1,19 +1,16 @@
 import logging
 from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel
+import torch
+import torch.nn.functional as F
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
 
+# Load model from HuggingFace Hub
+tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+model = AutoModel.from_pretrained('sentence-transformers/all-mpnet-base-v2')
 
-def load(name, max_seq_length):
-  """ loads HuggingFace SentenceTransformer model, sets options, and saves to disc """
-  try:
-    model = SentenceTransformer(name, device='cpu') # keeping on cpu for now since we dont batch
-    model.max_seq_length = max_seq_length
-    model.save(str(HERE/'models'/name), model_name=name, create_model_card=False)
-  except Exception as e:
-    raise(e)
-
-load('all-mpnet-base-v2', max_seq_length=384)
+tokenizer.save_pretrained(HERE/'models'/'all-mpnet-base-v2_tokenizer')
+model.save_pretrained(HERE/'models'/'all-mpnet-base-v2_model')
