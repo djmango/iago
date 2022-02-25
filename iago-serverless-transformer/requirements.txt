@@ -1,1 +1,2 @@
-sentence-transformers==2.2.0
+https://download.pytorch.org/whl/cpu/torch-1.10.2-cp39-cp39-manylinux2014_aarch64.whl
+sentence-transformers==2.*

@@ -138,4 +138,4 @@ job-skill-match/embedding/jobs/csv/
 *.csv
 .DS_Store
 *.tsv
-all-mpnet-base-v2/
+*all-mpnet-base-v2/

@@ -4,7 +4,8 @@ FROM public.ecr.aws/lambda/python:3.9
 COPY ./ ${LAMBDA_TASK_ROOT}/
 
 # install our dependencies
-RUN python3 -m pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT}
+RUN python3 -m pip install -r requirements.txt --target ${LAMBDA_TASK_ROOT} --no-cache-dir
+RUN chmod -R 0777 /var/task/models
 
 # Set the CMD to your handler (could also be done as a parameter override outside of the Dockerfile)
 CMD [ "handler.handler" ]

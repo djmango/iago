@@ -2,17 +2,23 @@ import json
 import logging
 from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
-
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.info('loading sentence_transformers')
+
+from sentence_transformers import SentenceTransformer
+
 
 model_name = 'all-mpnet-base-v2'
 model: SentenceTransformer
+logger.info(f'loading {model_name}..')
 try:
-    model = SentenceTransformer(HERE/'models'/model_name)
+    model = SentenceTransformer(model_name, device='cpu', cache_folder=HERE/'models')
 except Exception as e:
+    logger.error(e)
     raise(e)
+logger.info('model loaded')
 
 def handler(event, context):
     try:
