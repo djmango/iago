@@ -1,3 +1,4 @@
+import json
 import warnings
 from functools import lru_cache
 
@@ -50,16 +51,20 @@ class SentenceEncoder:
         Returns:
             dict: list of embeddings for each sentence embedding dimension = (384,)
         """
-        texts = [self.get_clean_text(text) for text in request["texts"]]
+        try:
+            if 'body' in request:
+                texts = [self.get_clean_text(text) for text in json.loads(request['body'])['texts']]
+            else:
+                texts = [self.get_clean_text(text) for text in request['texts']]
 
-        logger.info(f"Generating embeddings for {len(texts)} sentences")
+            logger.info(f"Generating embeddings for {len(texts)} sentences")
 
-        model_name = request.get('model_name', config.DEFAULT_MODEL_NAME)
+            model_name = request.get('model_name', config.DEFAULT_MODEL_NAME)
 
-        sentence_encoder = self.get_sent_encoder(model_name)
+            sentence_encoder = self.get_sent_encoder(model_name)
 
-        embeddings = sentence_encoder.encode(texts)
+            embeddings = sentence_encoder.encode(texts)
 
-        return {
-            "vectors": embeddings.tolist()
-        }
+            return {'vectors': embeddings.tolist()}
+        except Exception as e:
+            return {'error': e}
