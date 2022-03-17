@@ -67,4 +67,5 @@ class SentenceEncoder:
 
             return {'vectors': embeddings.tolist()}
         except Exception as e:
-            return {'error': e}
+            logger.error(e)
+            return {'error': str(e)}

@@ -128,6 +128,30 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Local state files & OS specifics
+.DS_Store
+node_modules/
+lerna-debug.log
+dist/
+pack/
+.BUILD_COMPLETED
+.local-npm/
+.tools/
+coverage/
+.nyc_output
+.LAST_BUILD
+*.sw[a-z]
+*~
+.idea
+
+# We don't want tsconfig at the root
+/tsconfig.json
+
+# CDK Context & Staging files
+cdk.context.json
+.cdk.staging/
+cdk.out/
+
 .vscode
 iago/staticfiles/
 *.json
@@ -139,3 +163,5 @@ job-skill-match/embedding/jobs/csv/
 .DS_Store
 *.tsv
 *all-mpnet-base-v2/
+.serverless
+sagemaker-serverless-huggingface-endpoint/

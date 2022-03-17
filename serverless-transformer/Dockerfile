@@ -19,4 +19,4 @@ RUN pip install pytest --no-cache-dir && pytest tests -s -vv
 
 RUN chmod -R 0777 $MODEL_DIR
 
-CMD ["main.lambda_handler"]
+CMD ["handler.lambda_handler"]
