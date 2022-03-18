@@ -13,6 +13,7 @@ urlpatterns = [
     path('content/query', views.querySubmit.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('topics/', views.topicList.as_view()),
+    path('transform/', views.transform.as_view()),
     path('topics/<str:name>', views.topic.as_view()),
 ]
 

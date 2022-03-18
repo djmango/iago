@@ -13,7 +13,7 @@ from iago.permissions import HasGroupPermission
 from rest_framework import status, views
 from rest_framework.response import Response
 
-from v0 import index, schemas, utils
+from v0 import index, schemas, utils, ai
 from v0.article import articlePipeline
 from v0.models import CachedJSON, Content, Job, Topic
 from v0.serializers import ContentSerializer, TopicSerializerAll
@@ -35,52 +35,6 @@ def updateCached():
 
     return {'AirtableMessages': airtableMessages.value}
 
-
-class messagesForLearner(views.APIView):
-    """ take user profile and course data and return applicable messsages """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'POST': ['bubble']
-    }
-
-    def post(self, request):
-        """ allow update of basic fields, as of now filename type and confidence """
-
-        # validate and load
-        if not utils.isValidJSON(request.body):
-            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        data = json.loads(request.body)
-
-        try:
-            jsonschema.validate(data, schema=schemas.messagesForLearnerSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        # get messsages from cached airtable if it exists, if it doesnt run the cache update
-        messages, created = CachedJSON.objects.get_or_create(key='AirtableMessages')
-        if created:
-            messages = updateCached()['AirtableMessages']
-        else:  # no need to wait for airtable if we already have a cached version
-            threading.Thread(target=updateCached, name='updateCached').start()
-            messages = messages.value  # since before we stored the whole object in this var
-
-        # this gets all possible unique locations to send messages from the airtable and converts to snake_case
-        locations = set([str(row['fields']['Location']).lower().replace(' ', '_') for row in messages if 'Location' in row['fields']])
-        # validate the sent location
-        if data['courseData']['location'] not in locations:
-            return Response({'status': 'error', 'response': f'location must be one of the following: {locations}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        learnerType = data['userProfile']['learner_type']
-        possibles = []
-
-        for row in messages:
-            # filter the messages so that we only get one relevant to our current position and learner type
-            if 'Learner type' in row['fields'] and (learnerType in row['fields']['Learner type'] or 'Everyone' in row['fields']['Learner type']) and str(row['fields']['Location']).lower().replace(' ', '_') == data['courseData']['location']:
-                possibles.append(row)
-
-        return Response({'messages': possibles}, status=status.HTTP_200_OK)
-
-
 class articleSubmit(views.APIView):
     """ submit an article to the pipeline """
     permission_classes = [HasGroupPermission]
@@ -89,24 +43,19 @@ class articleSubmit(views.APIView):
     }
 
     def post(self, request):
-        # validate and load
-        if not utils.isValidJSON(request.body):
-            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        data = json.loads(request.body)
-
         try:
-            jsonschema.validate(data, schema=schemas.articleSubmissionSchema)
+            jsonschema.validate(request.data, schema=schemas.articleSubmissionSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # we have now passed validation. time to fill the initial content object and pass it to the pipeline methods
         content = Content()
-        content.url_submitted = data['url']
-        if 'environment' in data:  # if we have the environment specified store it, default to test
-            content.environment = Content.LIVE if data['environment'] == 'live' else Content.TEST
+        content.url_submitted = request.data['url']
+        if 'environment' in request.data:  # if we have the environment specified store it, default to test
+            content.environment = Content.LIVE if request.data['environment'] == 'live' else Content.TEST
         content.save()
 
-        if 'sync' in data and data['sync']:
+        if 'sync' in request.data and request.data['sync']:
             content = articlePipeline(content)
             return Response(ContentSerializer(content).data, status=status.HTTP_200_OK)
         else:
@@ -123,19 +72,15 @@ class querySubmit(views.APIView):
     }
 
     def post(self, request):
-        if not utils.isValidJSON(request.body):
-            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        data = json.loads(request.body)
-
         try:
-            jsonschema.validate(data, schema=schemas.querySubmissionSchema)
+            jsonschema.validate(request.data, schema=schemas.querySubmissionSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        query = data['query']
-        k = data['k'] if 'k' in data else 5
+        query = request.data['query']
+        k = request.data['k'] if 'k' in request.data else 5
 
-        if 'text' not in data:  # query our database of content
+        if 'text' not in request.data:  # query our database of content
             inference, vector = index.content_index.query(query, k=k)
 
             # format for humans
@@ -162,7 +107,7 @@ class querySubmit(views.APIView):
 
             # we will just split by sentences for now
             # texts = data['text'].split('. ')
-            texts = [str(s) for s in re.split(r"(?<!^)\s*[.\n]+\s*(?!$)", data['text'])]
+            texts = [str(s) for s in re.split(r"(?<!^)\s*[.\n]+\s*(?!$)", request.data['text'])]
 
             # encode
             request_index = index.VectorIndex(texts)
@@ -180,6 +125,25 @@ class querySubmit(views.APIView):
         return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
 
 
+class transform(views.APIView):
+    """ transform texts """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['bubble']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.transformSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        # embed
+        vectors = ai.embedding_model.model.encode(request.data['texts'])
+
+        return Response({'vectors': vectors}, status=status.HTTP_200_OK)
+
+
 class jobSkillMatch(views.APIView):
     """ take a job title string and return matching skills """
     permission_classes = [HasGroupPermission]
@@ -188,23 +152,19 @@ class jobSkillMatch(views.APIView):
     }
 
     def post(self, request):
-        if not utils.isValidJSON(request.body):
-            return Response({'status': 'error', 'response': 'request body is not valid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-        data = json.loads(request.body)
-
         try:
-            jsonschema.validate(data, schema=schemas.jobSkillMatchSchema)
+            jsonschema.validate(request.data, schema=schemas.jobSkillMatchSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         start = time.perf_counter()
-        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', data['jobtitle'])).filter(similarity__gt=0.3).order_by('-similarity')
+        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', request.data['jobtitle'])).filter(similarity__gt=0.3).order_by('-similarity')
         job: Job = jobs.first()
         logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
-        
-        if job is None: # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
+
+        if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
             return Response({'skills': []}, status=status.HTTP_200_OK)
-        k = data['k'] if 'k' in data else 7
+        k = request.data['k'] if 'k' in request.data else 7
 
         # search index
         start = time.perf_counter()

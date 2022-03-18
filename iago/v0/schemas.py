@@ -64,3 +64,17 @@ jobSkillMatchSchema = {
     },
     "required": ["jobtitle"],
 }
+
+transformSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "texts": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": ["texts"],
+}
