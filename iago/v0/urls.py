@@ -7,7 +7,6 @@ from v0 import views
 logger = logging.getLogger(__name__)
 
 urlpatterns = [
-    path('assistant/msgsforlearner', views.messagesForLearner.as_view(), name='messagesforlearner'),
     path('content/submiturl', views.articleSubmit.as_view(), name='submiturl'),
     path('content/<uuid:id>', views.content.as_view(), name='content-detail'),
     path('content/query', views.querySubmit.as_view()),

@@ -36,5 +36,4 @@ urlpatterns = [
     path('alive/', v0.views.alive.as_view(), name='alive'),
     path('admin/', admin.site.urls),
     path('v0/', include('v0.urls')),
-    path('action/assistant/msgsforlearner', v0.views.messagesForLearner.as_view()) # this is just temp until minimum switches the call
 ]
