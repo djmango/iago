@@ -154,8 +154,6 @@ cdk.out/
 
 .vscode
 iago/staticfiles/
-*.json
-*.jsonc
 test
 iago/v0/models/
 job-skill-match/embedding/jobs/csv/

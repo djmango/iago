@@ -3,6 +3,20 @@ app: iago
 org: jeenyai
 
 frameworkVersion: "3"
+configValidationMode: error
+
+plugins:
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: transformer.iago.jeeny.ai
+    certificateName: "*.iago.jeeny.ai"
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: "regional"
+    securityPolicy: tls_1_2
+    apiType: http
 
 provider:
   name: aws
@@ -10,30 +24,12 @@ provider:
   region: eu-central-1
   architecture: arm64
 
-  # iam:
-  #   role:
-  #     statements:
-  #       - Effect: "Allow"
-  #         Action:
-  #           - "s3:ListBucket"
-  #           - "s3:PutObject"
-  #         Resource:
-  #           Fn::Join:
-  #             - ""
-  #             - - "arn:aws:s3:::"
-  #               - "Ref": "ServerlessDeploymentBucket"
-  #               - "/*"
-
-#  environment:
-#    variable1: value1
-
 functions:
   transformer:
     memorySize: 6064
-    timeout: 45 
+    timeout: 30
     image: 237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago-serverless-transformer:latest
     events:
       - httpApi:
-          path: /
           method: get
-# https://www.serverless.com/framework/docs/providers/aws/guide/serverless.yml#aws-resources
+          path: /
