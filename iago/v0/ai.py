@@ -20,7 +20,7 @@ class Model():
 
     def load(self):
         """ loads model """
-        self.model = SentenceTransformer(self.name, cache_folder=HERE/'models', device='cpu') # keeping on cpu for now since we dont batch
+        self.model = SentenceTransformer(self.name, cache_folder=HERE/'models')
         self.model.max_seq_length = self.max_seq_length
 
 # define embedding model

@@ -1,17 +1,15 @@
+import json
 import logging
-import re
 
 import scrapy
-from v0.models import Article
 from bs4 import BeautifulSoup
+from v0.models import ScrapedArticle
 from v0.utils import clean_str
-from langdetect import detect
 
 # setup logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-API_BASE_URL = 'http://api.scraperapi.com/'
 
 class MediumSpider(scrapy.spiders.CrawlSpider):
     name = 'medium'
@@ -21,7 +19,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         tags = tags.split(',')
 
-        self.seen_urls = set(Article.objects.all().values_list('url', flat=True))
+        self.seen_urls = set(ScrapedArticle.objects.all().values_list('url', flat=True))
         self.start_urls = [f'https://medium.com/tag/{tag}/archive/' for tag in tags]
 
     def start_requests(self):
@@ -37,7 +35,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         years = [int(x.text) for x in timebuckets]
 
-        for y in years: # generate urls for all months in the years we have articles
+        for y in years:  # generate urls for all months in the years we have articles
             yearUrl = response.url + "/" + str(y)
             for m in range(1, 12):
                 monUrl = yearUrl + "/" + str(m)
@@ -48,31 +46,22 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         monSoup = BeautifulSoup(str(response.text), features='lxml')
         allDays = monSoup.findAll("div", attrs={'class': 'timebucket'})
-        if len(allDays) != 0: # if we do have days lets check the day pages
+        if len(allDays) != 0:  # if we do have days lets check the day pages
             for a in allDays:
                 dayUrl = a.find("a")
-                if dayUrl is not None: # it could be not linked
+                if dayUrl is not None:  # it could be not linked
                     dayUrl = str(dayUrl['href'])
                     yield scrapy.Request(url=dayUrl, callback=self.parse_day)
 
-        else: # get articles directly from month/year whatever we got directed to
+        else:  # get articles directly from month/year whatever we got directed to
             links = list(monSoup.findAll("div", attrs={"class": "postArticle-readMore"}))
             for l in links:
                 # pull article link
                 articleLink = str(l.find("a")['href']).partition('?')[0]
-                 # get tag and if its not in the list of tags for this url then we add
-                tag = re.search(r'https:\/\/medium.com\/tag\/([^\/]+)\/archive\/', response.url).group(1)
-
                 if articleLink not in self.seen_urls:
                     self.seen_urls.add(articleLink)
-                    yield scrapy.Request(url=articleLink, callback=self.parse_article)
-                else:
-                    # check if our tag is stored if not add it
-                    existingArticles = Article.objects.filter(url=articleLink)
-                    for article in existingArticles:
-                        if tag not in article.tags:
-                            article.tags.append(tag)
-                            article.save()
+                    postID = articleLink.split('/')[-1].split('-')[-1]
+                    yield scrapy.Request(url=f'https://medium.com/_/api/posts/{postID}', callback=self.parse_article, meta={'articleLink': articleLink})
 
     def parse_day(self, response):
         """ get article links from days """
@@ -82,65 +71,68 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
         for l in links:
             # pull article link
             articleLink = str(l.find("a")['href']).partition('?')[0]
-            # get tag and if its not in the list of tags for this url then we add
-            tag = re.search(r'https:\/\/medium.com\/tag\/([^\/]+)\/archive\/', response.url).group(1)
-
             if articleLink not in self.seen_urls:
                 self.seen_urls.add(articleLink)
-                yield scrapy.Request(url=articleLink, callback=self.parse_article, meta={'tag': tag})
-            else:
-                # check if our tag is stored if not add it
-                existingArticles = Article.objects.filter(url=articleLink)
-                for article in existingArticles:
-                    if tag not in article.tags:
-                        article.tags.append(tag)
-                        article.save()
+                postID = articleLink.split('/')[-1].split('-')[-1]
+                yield scrapy.Request(url=f'https://medium.com/_/api/posts/{postID}', callback=self.parse_article, meta={'articleLink': articleLink})
 
     def parse_article(self, response):
-        """ actual article content page parse """
+        code = response.status
 
-        articleSoup = BeautifulSoup(str(response.text), features='lxml')
+        if code == 200:
+            yield self._post_200(response)
 
-        item = {}
-        item['url'] = response.url
-        item['tag'] = response.meta.get('tag')
+        elif code == 302:
+            yield self._post_302(response)
 
-        # some basic filters, first we bounce if this is a members-only article
-        if "aria-label=\"Member only content\"" in str(response.text):
+        elif code == 410:
+            yield self._post_410(response)
+
+        # add here other requests code if necessary
+
+    # https://github.com/S1M0N38/medium-scraper/blob/master/medium/spiders/post_spider.py
+    def _post_200(self, response):
+        data = json.loads(response.text[16:])
+        # https://pastebin.com/VRs24XmV
+        post = data['payload']['value']
+
+        # filter non eng
+        if post['detectedLanguage'] != 'en':
+            logger.info(f'BOUNCED {post["title"]} for majority non-english content')
             return
 
-        # bounce long urls, usually chinese or cryl encoded
-        if len(item['url']) <= 800:
-            sections = articleSoup.find_all('section')
+        article = ScrapedArticle()
+        article.url = response.meta.get('articleLink')
+        article.title = post['title']
+        # author is annoying
+        if 'references' in data['payload'] and 'User' in data['payload']['references']:
+            article.author = data['payload']['references']['User'].popitem()[1]['name']
+        elif '@' in article.url:
+            article.author = article.url.split('@')[1].split('/')[0]
 
-            story_paragraphs = []
-            section_titles = []
+        article.subtitle = post['virtuals']['subtitle']
+        article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
+        article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60) # NOTE THIS IS WRONG
+        article.provider = 'medium'
 
-            for section in sections: # get text content
-                paragraphs = section.find_all('p')
-                for paragraph in paragraphs:
-                    story_paragraphs.append(paragraph.text)
+        # concat paragraphs
+        paragraphs = []
+        for par in post['content']['bodyModel']['paragraphs']:
+            paragraphs.append(clean_str(par['text']))
 
-                subs = section.find_all('h1')
-                for sub in subs:
-                    section_titles.append(sub.text)
+        article.content = '\n\n'.join(paragraphs)
 
-            if len(story_paragraphs) > 0:
-                item['title'] = section_titles[0] if len(section_titles) != 0 else story_paragraphs[0]
-                item['content'] = ''
-                for p in story_paragraphs:
-                    item['content'] += p + '\n'
+        for t in post['virtuals']['tags']:
+            if t['type'] == 'Tag':
+                article.tags.append(t['slug'])
 
-                item['content'] = clean_str(item['content'])
+        logger.info('SCRAPED {post["title"]}')
+        return {'article': article}
 
-                try:
-                    if len(item['content']) < 50:
-                        logger.info(f'BOUNCED {item["title"]} for lack of content')
-                        return
-                    elif detect(item['content']) != 'en':
-                        logger.info(f'BOUNCED {item["title"]} for majority non-english content')
-                        return
-                except Exception as e:
-                    pass
-                else:
-                    yield item
+    def _post_302(self, response):
+        post_id = response.url.split('/')[-1]
+        logger.info('The post {post_id} removed (user is blacklisted)')
+
+    def _post_410(self, response):
+        post_id = response.url.split('/')[-1]
+        logger.info('The post {post_id} removed (user removed it)')

@@ -13,9 +13,9 @@ from iago.permissions import HasGroupPermission
 from rest_framework import status, views
 from rest_framework.response import Response
 
-from v0 import index, schemas, utils, ai
+from v0 import index, schemas, ai
 from v0.article import articlePipeline
-from v0.models import CachedJSON, Content, Job, Topic
+from v0.models import CachedJSON, Content, Job, ScrapedArticle, Topic
 from v0.serializers import ContentSerializer, TopicSerializerAll
 
 AIRTABLE_BASE = 'https://api.airtable.com/v0/'
@@ -128,9 +128,7 @@ class querySubmit(views.APIView):
 class transform(views.APIView):
     """ transform texts """
     permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['bubble']
-    }
+    allowed_groups = {}
 
     def get(self, request):
         try:
@@ -142,6 +140,31 @@ class transform(views.APIView):
         vectors = ai.embedding_model.model.encode(request.data['texts'])
 
         return Response({'vectors': vectors}, status=status.HTTP_200_OK)
+
+
+class transformScrapedArticles(views.APIView):
+    """ transform all scraped articles and saves the embeddings """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {}
+
+    def get(self, request):
+        # get all articles with no embeddings
+        start = time.perf_counter()
+        articles: list[ScrapedArticle] = list(ScrapedArticle.objects.filter(embedding_all_mpnet_base_v2__isnull=True))
+        # get their contents and embed them
+        contents = [x.content for x in articles]
+        logger.info(f'generating vectors for {len(articles)}')
+        vectors = ai.embedding_model.model.encode(contents, show_progress_bar=True)
+
+        # update the queryset articles with the new embeddings
+        logger.info('saving vectors..')
+        for article, vector in zip(articles, vectors):
+            article.embedding_all_mpnet_base_v2 = vector.tolist()
+            article.save()
+        
+        # bulk save
+        # ScrapedArticle.objects.bulk_update(articles, ['embedding_all_mpnet_base_v2'])
+        return Response({'status': 'good stuff', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

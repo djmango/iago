@@ -23,6 +23,28 @@ class Article(models.Model):  # this is the scraped article, not our internal co
         db_table = 'articles'
 
 
+class ScrapedArticle(models.Model):  # new version
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    url = models.URLField(max_length=800, unique=True)
+    author = models.TextField()
+    title = models.TextField()
+    subtitle = models.TextField(blank=True, null=True)
+    thumbnail = models.URLField(blank=True, null=True)
+    content = models.TextField()
+    # https://pypi.org/project/readtime/
+    content_read_seconds = models.IntegerField()  # seconds = num_words / 265 * 60 + img_weight * num_images
+    provider = models.CharField(max_length=100)
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now_add=True)
+    tags = models.JSONField(default=list)
+
+    # embeddings
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)
+
+    def __str__(self):
+        return str(self.title)
+
+
 class CachedJSON(models.Model):
     key = models.CharField(max_length=100, primary_key=True)
     value = models.JSONField(default=dict)

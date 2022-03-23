@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
-    'drf_yasg',
+    # 'drf_yasg',
 ]
 
 if DEBUG:
