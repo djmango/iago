@@ -29,32 +29,10 @@ jobs:
 
       - run: npm ci
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-
-      - name: Build container
-        run: docker buildx build --platform linux/arm64 --tag iago-serverless-transformer:latest ./transformer
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-central-1
-
-      - name: Push to ECR
-        id: ecr
-        uses: jwalton/gh-ecr-push@v1
-        with:
-          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          region: eu-central-1
-          image: iago-serverless-transformer:latest
-
       - name: Serverless Deploy
         uses: serverless/github-action@v3
         with:
-          args: deploy
+          args: -c "cd ./serverless && sls deploy"
     env:
       SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
