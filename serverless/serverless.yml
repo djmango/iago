@@ -6,18 +6,7 @@ frameworkVersion: "3"
 configValidationMode: error
 
 plugins:
-  - serverless-domain-manager
   - serverless-offline
-
-custom:
-  customDomain:
-    domainName: serverless.iago.jeeny.ai
-    certificateName: "*.iago.jeeny.ai"
-    createRoute53Record: true
-    createRoute53IPv6Record: true
-    endpointType: "regional"
-    securityPolicy: tls_1_2
-    apiType: http
 
 provider:
   name: aws

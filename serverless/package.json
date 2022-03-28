@@ -4,7 +4,6 @@
   "description": "bahhh",
   "author": "djmango",
   "devDependencies": {
-    "serverless-domain-manager": "^6.0.2",
     "serverless-offline": "^8.5.0"
   },
   "dependencies": {
