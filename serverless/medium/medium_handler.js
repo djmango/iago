@@ -26,7 +26,17 @@ function getRequest(url) {
 
 exports.handler = async function (event, context, callback) {
     try {
-        let url = event.pathParameters.url
+        console.log(event)
+        if ('body' in event && 'url' in event.body) {
+            let url = JSON.parse(event.body).url;
+        } else if ('pathParameters' in event && 'url' in event.pathParameters) {
+            let url = event.pathParameters.url;
+        } else if ('url' in event) {
+            let url = event.url;
+        } else {
+            throw new Error('Invalid request. Must contain URL in body or pathParameters.');
+        }
+        // TODO: should put a validator here to ensure its a medium url or at least has a medium id
         let id = url.split('/').pop().split('-').pop()
         let apiUrl = `https://medium.com/_/api/posts/${id}?format=json`
         let result = await getRequest(apiUrl);
