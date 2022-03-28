@@ -148,6 +148,7 @@ class transformScrapedArticles(views.APIView):
     allowed_groups = {}
 
     def get(self, request):
+        # TODO: make this a background process
         # get all articles with no embeddings
         start = time.perf_counter()
         articles: list[ScrapedArticle] = list(ScrapedArticle.objects.filter(embedding_all_mpnet_base_v2__isnull=True))

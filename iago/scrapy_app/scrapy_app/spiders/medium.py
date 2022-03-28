@@ -126,7 +126,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
             if t['type'] == 'Tag':
                 article.tags.append(t['slug'])
 
-        logger.info('SCRAPED {post["title"]}')
+        # logger.info(f'SCRAPED {post["title"]}')
         return {'article': article}
 
     def _post_302(self, response):

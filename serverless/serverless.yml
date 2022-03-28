@@ -10,7 +10,7 @@ plugins:
 
 custom:
   customDomain:
-    domainName: transformer.iago.jeeny.ai
+    domainName: serverless.iago.jeeny.ai
     certificateName: "*.iago.jeeny.ai"
     createRoute53Record: true
     createRoute53IPv6Record: true

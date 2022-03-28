@@ -9,21 +9,7 @@ from v0.ai import embedding_model
 
 logger = logging.getLogger(__name__)
 
-
-class Article(models.Model):  # this is the scraped article, not our internal content representation
-    title = models.TextField()
-    content = models.TextField()
-    url = models.URLField(max_length=800)
-    tags = models.JSONField(default=list)
-
-    def __str__(self):
-        return str(self.title)
-
-    class Meta:
-        db_table = 'articles'
-
-
-class ScrapedArticle(models.Model):  # new version
+class ScrapedArticle(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     url = models.URLField(max_length=800, unique=True)
     author = models.TextField()

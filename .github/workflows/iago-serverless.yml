@@ -1,0 +1,64 @@
+name: Iago Serverless
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "serverless/**"
+
+jobs:
+  serverless-transformer:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [14.x]
+    defaults:
+      run:
+        working-directory: ./serverless
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - run: npm ci
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Build container
+        run: docker buildx build --platform linux/arm64 --tag iago-serverless-transformer:latest .
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Push to ECR
+        id: ecr
+        uses: jwalton/gh-ecr-push@v1
+        with:
+          access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          region: eu-central-1
+          image: iago-serverless-transformer:latest
+
+      - name: Update Lambda with image
+        run: aws lambda update-function-code --function-name iago-serverless-transformer --image-uri 237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago-serverless-transformer:latest
+
+      - name: Serverless Deploy
+        uses: serverless/github-action@v3
+        with:
+          args: deploy
+    env:
+      SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

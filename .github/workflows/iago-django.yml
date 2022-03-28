@@ -36,12 +36,10 @@ jobs:
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPO_IAGO: iago
-        # ECR_REPO_IAGO_SERVERLESS: iago-serverless-transformer
         IMAGE_TAG: ${{ github.sha }}
       run: |
         # Build a docker container and push it to ECR so that it can be deployed to ECS.
         docker-compose -f docker-compose.deploy.yml build
-        # docker build -t $ECR_REGISTRY/$ECR_REPO_IAGO_SERVERLESS:$IMAGE_TAG ./iago-serverless-transformer
         docker tag iago:django-latest $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
         docker tag iago:nginx-latest $ECR_REGISTRY/$ECR_REPO_IAGO:nginx-latest
         docker push $ECR_REGISTRY/$ECR_REPO_IAGO:$IMAGE_TAG
