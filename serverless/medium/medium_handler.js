@@ -27,12 +27,13 @@ function getRequest(url) {
 exports.handler = async function (event, context, callback) {
     try {
         console.log(event);
+        let url;
         if ('body' in event && event.body.indexOf('url') !== -1) {
-            const url = JSON.parse(event.body).url;
+            url = JSON.parse(event.body).url;
         } else if ('pathParameters' in event && 'url' in event.pathParameters) {
-            const url = event.pathParameters.url;
+            url = event.pathParameters.url;
         } else if (event.indexOf('url') !== -1) {
-            const url = JSON.parse(event).url;
+            url = JSON.parse(event).url;
         } else {
             throw new Error('Invalid request. Must contain URL in body or pathParameters.');
         }
