@@ -27,7 +27,7 @@ function getRequest(url) {
 exports.handler = async function (event, context, callback) {
     try {
         console.log(event);
-        if ('body' in event && 'url' in event.body) {
+        if ('body' in event && event.body.indexOf('url') !== -1) {
             const url = JSON.parse(event.body).url;
         } else if ('pathParameters' in event && 'url' in event.pathParameters) {
             const url = event.pathParameters.url;
