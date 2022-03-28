@@ -33,7 +33,7 @@ jobs:
         uses: docker/setup-qemu-action@v1
 
       - name: Build container
-        run: docker buildx build --platform linux/arm64 --tag iago-serverless-transformer:latest .
+        run: docker buildx build --platform linux/arm64 --tag iago-serverless-transformer:latest ./transformer
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -50,9 +50,6 @@ jobs:
           secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           region: eu-central-1
           image: iago-serverless-transformer:latest
-
-      - name: Update Lambda with image
-        run: aws lambda update-function-code --function-name iago-serverless-transformer --image-uri 237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago-serverless-transformer:latest
 
       - name: Serverless Deploy
         uses: serverless/github-action@v3

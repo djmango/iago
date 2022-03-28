@@ -1,17 +1,13 @@
 {
-  "name": "serverless-transformer",
+  "name": "iago-serverless",
   "version": "1.0.0",
-  "description": "Sentence Encoding using Sentence Transformers on AWS Lambda. See <https://github.com/bhavsarpratik/serverless-transformers-on-aws-lambda>",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
+  "description": "bah",
   "author": "djmango",
   "devDependencies": {
-    "serverless-domain-manager": "^6.0.2"
+    "serverless-domain-manager": "^6.0.2",
+    "serverless-offline": "^8.5.0"
+  },
+  "dependencies": {
+    "serverless": "^3.10.0"
   }
 }
