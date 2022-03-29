@@ -30,16 +30,6 @@ class ScrapedArticle(models.Model):
     def __str__(self):
         return str(self.title)
 
-
-class CachedJSON(models.Model):
-    key = models.CharField(max_length=100, primary_key=True)
-    value = models.JSONField(default=dict)
-    last_modified = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'cachedjson'
-
-
 class Content(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 

@@ -1,0 +1,16 @@
+{
+    "python.pythonPath": "C:\\Users\\skgho\\anaconda3\\envs\\jeeny\\python.exe",
+    "python.analysis.extraPaths": [
+        "./",
+        "./iago/",
+        "./iago/iago",
+    ],
+    "python.testing.pytestArgs": [
+        "serverless-transformer"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "yaml.schemas": {
+        "https://raw.githubusercontent.com/lalcebo/json-schema/master/serverless/reference.json": "file:///Users/djmango/github/jeeny/iago/serverless-transformer/serverless.yml"
+    },
+}

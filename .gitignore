@@ -152,7 +152,6 @@ cdk.context.json
 .cdk.staging/
 cdk.out/
 
-.vscode
 iago/staticfiles/
 test
 iago/v0/models/

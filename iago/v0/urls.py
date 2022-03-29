@@ -7,7 +7,6 @@ from v0 import views
 logger = logging.getLogger(__name__)
 
 urlpatterns = [
-    path('content/submiturl', views.articleSubmit.as_view(), name='submiturl'),
     path('content/<uuid:id>', views.content.as_view(), name='content-detail'),
     path('content/query', views.querySubmit.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
@@ -21,4 +20,10 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
-    
+    # from v0.index import skills_index
+
+    # skills_index.query_min_distance('massage therapist', k=10, min_distance=.1)
+    # skills_index.query_min_distance('massage therapist', k=10, min_distance=.2)
+    # skills_index.query_min_distance('massage therapist', k=10, min_distance=.3)
+    # skills_index.query_min_distance('massage therapist', k=10, min_distance=.4)
+    # skills_index.query_min_distance('massage therapist', k=10, min_distance=.5)

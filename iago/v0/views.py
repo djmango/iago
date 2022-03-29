@@ -1,67 +1,22 @@
-import json
 import logging
 import os
 import re
 import threading
 import time
 
+import boto3
 import jsonschema
 import numpy as np
-import requests
 from django.contrib.postgres.search import TrigramSimilarity
 from iago.permissions import HasGroupPermission
 from rest_framework import status, views
 from rest_framework.response import Response
 
-from v0 import index, schemas, ai
-from v0.article import articlePipeline
-from v0.models import CachedJSON, Content, Job, ScrapedArticle, Topic
+from v0 import ai, index, schemas
+from v0.models import Content, Job, ScrapedArticle, Topic
 from v0.serializers import ContentSerializer, TopicSerializerAll
 
-AIRTABLE_BASE = 'https://api.airtable.com/v0/'
-AIRTABLE_KEY = os.getenv('AIRTABLE_KEY')
-
 logger = logging.getLogger(__name__)
-
-
-def updateCached():
-    # get messsages from airtable
-    headers = {'Authorization': 'Bearer ' + AIRTABLE_KEY}
-    r = requests.get(AIRTABLE_BASE+'appL382zVdInLM23F/Messages?', headers=headers)
-
-    airtableMessages, created = CachedJSON.objects.get_or_create(key='AirtableMessages')
-    airtableMessages.value = json.loads(r.text)['records']
-    airtableMessages.save()
-
-    return {'AirtableMessages': airtableMessages.value}
-
-class articleSubmit(views.APIView):
-    """ submit an article to the pipeline """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'POST': ['bubble']
-    }
-
-    def post(self, request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.articleSubmissionSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        # we have now passed validation. time to fill the initial content object and pass it to the pipeline methods
-        content = Content()
-        content.url_submitted = request.data['url']
-        if 'environment' in request.data:  # if we have the environment specified store it, default to test
-            content.environment = Content.LIVE if request.data['environment'] == 'live' else Content.TEST
-        content.save()
-
-        if 'sync' in request.data and request.data['sync']:
-            content = articlePipeline(content)
-            return Response(ContentSerializer(content).data, status=status.HTTP_200_OK)
-        else:
-            # pass to pipeline methods, pipeline is basically just defined here riht now, will build something more structured once we have decided architecture
-            threading.Thread(target=articlePipeline, name=f'articlePipeline_{content.id}', args=[content]).start()
-            return Response({'content_id': content.id}, status=status.HTTP_201_CREATED)
 
 
 class querySubmit(views.APIView):
@@ -142,30 +97,33 @@ class transform(views.APIView):
         return Response({'vectors': vectors}, status=status.HTTP_200_OK)
 
 
+def transformArticles(articles):
+    """ transform articles into vectors and save to db """
+    # get their contents and embed them
+    logger.info(f'generating vectors for {len(articles)}')
+    contents = [x.content for x in articles]
+    vectors = ai.embedding_model.model.encode(contents, show_progress_bar=True)
+
+    # update the queryset articles with the new embeddings
+    logger.info('saving vectors..')
+    for article, vector in zip(articles, vectors):
+        article.embedding_all_mpnet_base_v2 = vector.tolist()
+        article.save()
+
+
 class transformScrapedArticles(views.APIView):
     """ transform all scraped articles and saves the embeddings """
     permission_classes = [HasGroupPermission]
     allowed_groups = {}
 
     def get(self, request):
-        # TODO: make this a background process
         # get all articles with no embeddings
         start = time.perf_counter()
         articles: list[ScrapedArticle] = list(ScrapedArticle.objects.filter(embedding_all_mpnet_base_v2__isnull=True))
-        # get their contents and embed them
-        contents = [x.content for x in articles]
-        logger.info(f'generating vectors for {len(articles)}')
-        vectors = ai.embedding_model.model.encode(contents, show_progress_bar=True)
 
-        # update the queryset articles with the new embeddings
-        logger.info('saving vectors..')
-        for article, vector in zip(articles, vectors):
-            article.embedding_all_mpnet_base_v2 = vector.tolist()
-            article.save()
-        
-        # bulk save
-        # ScrapedArticle.objects.bulk_update(articles, ['embedding_all_mpnet_base_v2'])
-        return Response({'status': 'good stuff', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
+        # start transforming in a thread
+        threading.Thread(target=transformArticles, name=f'transformArticles_{len(articles)}', args=[articles]).start()
+        return Response({'status': 'started', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

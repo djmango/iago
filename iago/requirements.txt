@@ -9,7 +9,7 @@ twisted[tls,http2]
 langdetect==1.0.9
 scrapy==2.6.1
 beautifulsoup4==4.10.0
-boto3==1.20.7
+boto3==1.21.28
 faiss-cpu==1.7.2
 sentence-transformers==2.1.0
 django-extensions
