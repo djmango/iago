@@ -101,6 +101,17 @@ class Job(models.Model):
 class Skill(models.Model):
     name = models.CharField(max_length=255, primary_key=True, editable=False)
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+    cluster = models.ForeignKey('SkillCluster', on_delete=models.SET_NULL, blank=True, null=True)
 
     def __str__(self):
         return str(self.name)
+
+class SkillCluster(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    k_top = models.OneToOneField(Skill, on_delete=models.PROTECT)
+
+    def __str__(self) -> str:
+        if self.k_top is not None:
+            return str(self.k_top.name)
+        else:
+            return str(self.id)
