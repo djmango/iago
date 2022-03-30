@@ -32,8 +32,8 @@ exports.handler = async function (event, context, callback) {
             url = JSON.parse(event.body).url;
         } else if ('pathParameters' in event && 'url' in event.pathParameters) {
             url = event.pathParameters.url;
-        } else if (event.indexOf('url') !== -1) {
-            url = JSON.parse(event).url;
+        } else if (typeof event === 'object' && !Array.isArray(event) && event !== null) {
+            url = event.url;
         } else {
             throw new Error('Invalid request. Must contain URL in body or pathParameters.');
         }
