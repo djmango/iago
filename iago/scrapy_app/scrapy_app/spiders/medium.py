@@ -112,7 +112,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         article.subtitle = post['virtuals']['subtitle']
         article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
-        article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60) # NOTE THIS IS WRONG
+        article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60)
         article.provider = 'medium'
 
         # concat paragraphs

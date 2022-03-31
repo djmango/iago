@@ -1,20 +1,22 @@
+import json
 import logging
-import os
 import re
 import threading
 import time
+from multiprocessing.pool import ThreadPool
 
-import boto3
 import jsonschema
 import numpy as np
+import requests
 from django.contrib.postgres.search import TrigramSimilarity
+from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission
 from rest_framework import status, views
 from rest_framework.response import Response
 
 from v0 import ai, index, schemas
-from v0.models import Content, Job, ScrapedArticle, Topic
-from v0.serializers import ContentSerializer, TopicSerializerAll
+from v0.models import Job, ScrapedArticle, Skill, Topic
+from v0.serializers import TopicSerializerAll
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ class querySubmit(views.APIView):
         k = request.data['k'] if 'k' in request.data else 5
 
         if 'text' not in request.data:  # query our database of content
-            inference, vector = index.content_index.query(query, k=k)
+            inference, vector = index.scrapedarticle_index.query(query, k=k)
 
             # format for humans
             neu_inferences = []
@@ -49,19 +51,7 @@ class querySubmit(views.APIView):
                 neu_inferences.append(structured_topic)
 
         else:  # query the provided text
-            # texts = ['']
-            # i = 0
-            # for word in data['text'].split('. '):
-            #     # bump to next text boundary if we are above 50 words
-            #     if utils.words_in(texts[i]) > 50:
-            #         texts[i] = texts[i].strip()
-            #         i += 1
-            #         texts.append('')
-            #     # concat to current segment
-            #     texts[i] += str(word) + ' '
-
             # we will just split by sentences for now
-            # texts = data['text'].split('. ')
             texts = [str(s) for s in re.split(r"(?<!^)\s*[.\n]+\s*(?!$)", request.data['text'])]
 
             # encode
@@ -125,6 +115,55 @@ class transformScrapedArticles(views.APIView):
         threading.Thread(target=transformArticles, name=f'transformArticles_{len(articles)}', args=[articles]).start()
         return Response({'status': 'started', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
 
+def updateArticle(article_uuid):
+    """ seperate function for job pooling """
+    start = time.perf_counter()
+
+    article: ScrapedArticle = ScrapedArticle.objects.get(uuid=article_uuid)
+
+    postID = article.url.split('/')[-1].split('-')[-1]
+    r = requests.get(f'https://medium.com/_/api/posts/{postID}')
+    data = json.loads(r.text[16:])
+    post = data['payload']['value']
+    logger.info(f'Call took {time.perf_counter()-start:.3f}s')
+
+    skills: list[Skill] = index.skills_index.query_vector(article.embedding_all_mpnet_base_v2, k=10, min_distance=.21)
+    
+    for skill, similarity in skills:
+        article.skills.add(skill)
+
+    article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
+
+    article.updated_on = Now()
+    article.save()
+    logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
+
+def updateScrapedArticles():
+    """ update scraped articles with their medium data """
+
+    start = time.perf_counter()
+    articles_uuid = list(ScrapedArticle.objects.all().values_list('uuid', flat=True))
+    logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
+    logger.info(f'Updating data for {len(articles_uuid)} articles')
+
+    p = ThreadPool(processes=20)
+    p.map(updateArticle, articles_uuid)
+    p.close()
+
+class skillSearch(views.APIView):
+    permission_classes = [HasGroupPermission]
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.queryKSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        k = int(request.data['k'])
+
+        skills = Skill.objects.annotate(similarity=TrigramSimilarity('name', query)).filter(similarity__gt=0.3).order_by('-similarity')
+        return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
 
 class jobSkillMatch(views.APIView):
     """ take a job title string and return matching skills """
@@ -155,23 +194,6 @@ class jobSkillMatch(views.APIView):
         logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
 
         return Response({'jobtitle': str(job.name), 'skills': skills}, status=status.HTTP_200_OK)
-
-
-# model based views
-
-
-class content(views.APIView):
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['bubble']
-    }
-
-    def get(self, request, id):
-        if Content.objects.filter(id=id).count() > 0:
-            return Response(ContentSerializer(Content.objects.get(id=id)).data, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': f'{id} not found'}, status=status.HTTP_404_NOT_FOUND)
-
 
 # Topic CRUD class views
 

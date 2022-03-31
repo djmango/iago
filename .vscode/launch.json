@@ -25,9 +25,10 @@
             "django": true
         },
         {
-            "name": "Django Remote Attach",
+            "name": "Django Docker Remote Attach",
             "type": "python",
             "request": "attach",
+            // "preLaunchTask": "docker-compose-start",
             "port": 5678,
             "host": "localhost",
             "pathMappings": [

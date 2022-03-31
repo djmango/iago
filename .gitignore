@@ -161,4 +161,3 @@ job-skill-match/embedding/jobs/csv/
 *.tsv
 *all-mpnet-base-v2/
 .serverless
-sagemaker-serverless-huggingface-endpoint/
