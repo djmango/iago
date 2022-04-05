@@ -77,7 +77,7 @@ class transform(views.APIView):
 
     def get(self, request):
         try:
-            jsonschema.validate(request.data, schema=schemas.transformSchema)
+            jsonschema.validate(request.data, schema=schemas.textsSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -86,6 +86,37 @@ class transform(views.APIView):
 
         return Response({'vectors': vectors}, status=status.HTTP_200_OK)
 
+class matchSkills(views.APIView):
+    """ take texts and return their embedding and related skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['scrapy_spider']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.textsSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        texts = request.data['texts']
+
+        # embed all texts in batch
+        vectors = ai.embedding_model.model.encode(texts)
+
+        results = []
+        # find skills for each text/vector and populate results
+        for vector in vectors:
+            # find the closest skills
+            skills: list[Skill] = index.skills_index.query_vector(vector, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
+
+            # add to results
+            results.append({
+                'skills': [x[0].name for x in skills],
+                'vector': vector.tolist()
+            })
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
 
 def transformArticles(articles):
     """ transform articles into vectors and save to db """
@@ -188,7 +219,7 @@ class contentSkillSearch(views.APIView):
         skills = []
         # for each skill in the query, find its closest match in the skills database
         for skill_name in request.data['skills']:
-            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.6).order_by('-similarity').first()
+            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
             if skill is not None:
                 skills.append(skill)
         logger.info(f'Skill search took {round(time.perf_counter() - start, 3)}s')
