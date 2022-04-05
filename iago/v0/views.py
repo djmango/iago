@@ -182,7 +182,6 @@ class contentSkillSearch(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        k = request.data['k'] if 'k' in request.data else 50
         strict = request.data['strict'] if 'strict' in request.data else False
 
         start = time.perf_counter()
@@ -205,6 +204,7 @@ class contentSkillSearch(views.APIView):
             content = list(ScrapedArticle.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'updated_on'))
         logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
+        k = request.data['k'] if 'k' in request.data else len(content)
         return Response({'content': content[:k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
