@@ -11,6 +11,7 @@ urlpatterns = [
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('skillspace/search_skills', views.skillSearch.as_view()),
     path('skillspace/search_content', views.contentSkillSearch.as_view()),
+    path('skillspace/adjacent_skills', views.adjacentSkills.as_view()),
     path('skillspace/match', views.matchSkills.as_view()),
     path('skillspace/match_embeds', views.matchSkillsEmbeds.as_view()),
     path('topics/', views.topicList.as_view()),

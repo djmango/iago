@@ -94,3 +94,27 @@ contentSkillsSearchSchema = {
     },
     "required": ["skills"],
 }
+
+
+adjacentSkillsSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "skills": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "k": {
+            "type": "integer"
+        },
+        "temperature": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+            "inclusiveMaximum": 100
+        }
+        
+    },
+    "required": ["skills"],
+}

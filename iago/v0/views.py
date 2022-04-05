@@ -145,6 +145,36 @@ class matchSkillsEmbeds(views.APIView):
 
         return Response({'results': results}, status=status.HTTP_200_OK)
 
+
+class adjacentSkills(views.APIView):
+    """ take embeds return their related skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['scrapy_spider']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        k = request.data['k'] if 'k' in request.data else 25
+        temperature = int(request.data['temperature'])/100 if 'temperature' in request.data else .21
+
+        skills = []
+        # for each skill in the query, find its closest match in the skills database
+        for skill_name in request.data['skills']:
+            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
+            if skill is not None:
+                # get adjacent skills for our skill
+                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
+        
+                skills.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r]})
+
+        return Response({'skills': skills}, status=status.HTTP_200_OK)
+
+
 def transformArticles(articles):
     """ transform articles into vectors and save to db """
     # get their contents and embed them
