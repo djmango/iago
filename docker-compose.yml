@@ -12,6 +12,8 @@ services:
         restart: unless-stopped
         ports:
             - 5678:5678
+        stdin_open: true
+        tty: true
 
     nginx:
         build:
@@ -22,4 +24,3 @@ services:
         restart: unless-stopped
         depends_on:
             - django
-            

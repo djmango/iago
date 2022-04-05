@@ -3,11 +3,11 @@ import uuid
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from django.utils import timezone
 
 from v0.ai import embedding_model
 
 logger = logging.getLogger(__name__)
+
 
 class Topic(models.Model):
     """ Topic object, with embedding field """
@@ -37,6 +37,12 @@ class Skill(models.Model):
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
     cluster = models.ForeignKey('SkillCluster', on_delete=models.SET_NULL, blank=True, null=True)
 
+    def create(self, name: str):
+        """ Set name and generate embedding """
+        self.name = name.lower()
+        self.embedding_all_mpnet_base_v2 = list(embedding_model.model.encode(name))
+        return self
+
     def __str__(self):
         return str(self.name)
 
@@ -63,6 +69,7 @@ class ScrapedArticle(models.Model):
 
     def __str__(self):
         return str(self.title)
+
 
 class SkillCluster(models.Model):
     id = models.BigAutoField(primary_key=True)

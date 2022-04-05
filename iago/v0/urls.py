@@ -3,14 +3,14 @@ import logging
 from django.urls import path
 from iago.settings import DEBUG
 from v0 import views
-from v0.models import ScrapedArticle
 
 logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path('content/query', views.querySubmit.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
-    path('skillspace/search', views.skillSearch.as_view()),
+    path('skillspace/search_skills', views.skillSearch.as_view()),
+    path('skillspace/search_content', views.contentSkillSearch.as_view()),
     path('topics/', views.topicList.as_view()),
     path('transform/', views.transform.as_view()),
     path('transformarticles/', views.transformScrapedArticles.as_view()),
@@ -21,10 +21,6 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
-
-    # from v0.views import updateScrapedArticles
-
-    # updateScrapedArticles()
 
     # from v0.models import SkillCluster, Skill
     # from sentence_transformers import util

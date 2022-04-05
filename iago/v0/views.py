@@ -25,7 +25,7 @@ class querySubmit(views.APIView):
     """ get related articles to the submitted query """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
-        'POST': ['bubble']
+        'POST': ['express_api']
     }
 
     def post(self, request):
@@ -115,6 +115,7 @@ class transformScrapedArticles(views.APIView):
         threading.Thread(target=transformArticles, name=f'transformArticles_{len(articles)}', args=[articles]).start()
         return Response({'status': 'started', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
 
+
 def updateArticle(article_uuid):
     """ seperate function for job pooling """
     start = time.perf_counter()
@@ -128,7 +129,7 @@ def updateArticle(article_uuid):
     logger.info(f'Call took {time.perf_counter()-start:.3f}s')
 
     skills: list[Skill] = index.skills_index.query_vector(article.embedding_all_mpnet_base_v2, k=10, min_distance=.21)
-    
+
     for skill, similarity in skills:
         article.skills.add(skill)
 
@@ -137,6 +138,7 @@ def updateArticle(article_uuid):
     article.updated_on = Now()
     article.save()
     logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
+
 
 def updateScrapedArticles():
     """ update scraped articles with their medium data """
@@ -149,6 +151,7 @@ def updateScrapedArticles():
     p = ThreadPool(processes=20)
     p.map(updateArticle, articles_uuid)
     p.close()
+
 
 class skillSearch(views.APIView):
     permission_classes = [HasGroupPermission]
@@ -165,11 +168,51 @@ class skillSearch(views.APIView):
         skills = Skill.objects.annotate(similarity=TrigramSimilarity('name', query)).filter(similarity__gt=0.3).order_by('-similarity')
         return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
 
+
+class contentSkillSearch(views.APIView):
+    """ search for content based on skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.contentSkillsSearchSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        k = request.data['k'] if 'k' in request.data else 50
+        strict = request.data['strict'] if 'strict' in request.data else False
+
+        start = time.perf_counter()
+        skills = []
+        # for each skill in the query, find its closest match in the skills database
+        for skill_name in request.data['skills']:
+            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.6).order_by('-similarity').first()
+            if skill is not None:
+                skills.append(skill)
+        logger.info(f'Skill search took {round(time.perf_counter() - start, 3)}s')
+
+        if len(skills) == 0:
+            return Response({'WILL_WRITE_ERROR_LATER_NO_FOUND_SKILLS': []}, status=status.HTTP_200_OK)
+
+        # search content based on the skills
+        start = time.perf_counter()
+        if strict:
+            content = list(ScrapedArticle.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'updated_on'))
+        else:
+            content = list(ScrapedArticle.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'updated_on'))
+        logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
+
+        return Response({'content': content[:k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+
+
 class jobSkillMatch(views.APIView):
     """ take a job title string and return matching skills """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
-        'POST': ['bubble']
+        'POST': ['express_api']
     }
 
     def post(self, request):
@@ -197,6 +240,7 @@ class jobSkillMatch(views.APIView):
 
 # Topic CRUD class views
 
+
 class topicList(views.APIView):
     def get(self, request):
         return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
@@ -206,7 +250,7 @@ class topic(views.APIView):
     """ CRUD for specified topic """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
-        'GET': ['bubble']
+        'GET': ['express_api']
     }
 
     def get(self, request, name: str):

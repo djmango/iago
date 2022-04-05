@@ -74,7 +74,7 @@ class VectorIndex():
 
         # get indices in the global index of the results we want to keep
         cleaned_indices = [int(x) for i, x in enumerate(indices[0]) if i not in results_to_remove]
-        self.logger.debug(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
+        self.logger.info(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
 
         return cleaned_indices
 
@@ -100,7 +100,7 @@ class VectorIndex():
             p = 1
 
         values, indices = self.index.search(query_vector, k*p)
-        self.logger.debug(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
+        self.logger.info(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:
@@ -132,7 +132,7 @@ class VectorIndex():
             p = 1
 
         values, indices = self.index.search(query_vector, k*p)
-        self.logger.debug(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
+        self.logger.info(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:

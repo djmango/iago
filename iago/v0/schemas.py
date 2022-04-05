@@ -58,3 +58,24 @@ transformSchema = {
     },
     "required": ["texts"],
 }
+
+contentSkillsSearchSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "skills": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "k": {
+            "type": "integer"
+        },
+        "strict": {
+            "type": "boolean"
+        }
+        
+    },
+    "required": ["skills"],
+}
