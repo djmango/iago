@@ -102,18 +102,45 @@ class matchSkills(views.APIView):
         texts = request.data['texts']
 
         # embed all texts in batch
-        vectors = ai.embedding_model.model.encode(texts)
+        embeds = ai.embedding_model.model.encode(texts)
 
         results = []
         # find skills for each text/vector and populate results
-        for vector in vectors:
+        for embed in embeds:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query_vector(vector, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
+            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
 
             # add to results
             results.append({
                 'skills': [x[0].name for x in skills],
-                'vector': vector.tolist()
+                'embed': embed.tolist()
+            })
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
+
+
+class matchSkillsEmbeds(views.APIView):
+    """ take embeds return their related skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['scrapy_spider']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.embedsSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        # find skills for each text/vector and populate results
+        for embed in request.data['embeds']:
+            # find the closest skills
+            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
+
+            # add to results
+            results.append({
+                'skills': [x[0].name for x in skills]
             })
 
         return Response({'results': results}, status=status.HTTP_200_OK)

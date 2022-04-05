@@ -131,11 +131,22 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
                 article.tags.append(t['slug'])
 
         # do article AI processing, use Iago api
-        r = requests.get('https://api.iago.jeeny.ai/v0/skillspace/match', json={'texts': [article.content]}, auth=(self.IAGO_API_USER, self.IAGO_API_PASS))
+
+        # use serverless to get the embedding
+        r = requests.get('https://serverless.iago.jeeny.ai/transform', json={'texts': [article.content]}, verify=False) # didnt fix the ssl issue on serverless yet
+        if r.status_code == 200:
+            logger.info(f'IAGO serverless embed complete for {article.title}')
+            article.embedding_all_mpnet_base_v2 = r.json()['vectors'][0]
+        else:
+            logger.error(f'Iago Serverless API {r.status_code} {r.text}')
+            return
+
+        # then use django iago to get the skills
+        r = requests.get('https://api.iago.jeeny.ai/v0/skillspace/match_embeds', json={'embeds': [article.embedding_all_mpnet_base_v2]}, auth=(self.IAGO_API_USER, self.IAGO_API_PASS))
+        # r = requests.get('http://localhost:80/v0/skillspace/match_embeds', json={'embeds': [article.embedding_all_mpnet_base_v2]}, auth=(self.IAGO_API_USER, self.IAGO_API_PASS))
         if r.status_code == 200:
             logger.info(f'IAGO processing complete for {article.title}')
             article_ai_data = r.json()['results'][0]
-            article.embedding_all_mpnet_base_v2 = article_ai_data['vector']
             article.save()
             for skill in article_ai_data['skills']:
                 article.skills.add(Skill.objects.get(name=skill))
