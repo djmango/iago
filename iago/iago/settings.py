@@ -34,6 +34,8 @@ else:
 
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
+CSRF_TRUSTED_ORIGINS = ['https://api.iago.jeeny.ai']
+
 # model names
 TOPIC_MODEL_NAME = 'topic_v0.10'
 

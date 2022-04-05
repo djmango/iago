@@ -1,9 +1,11 @@
 import json
 import logging
+import requests
+import os
 
 import scrapy
 from bs4 import BeautifulSoup
-from v0.models import ScrapedArticle
+from v0.models import ScrapedArticle, Skill
 from v0.utils import clean_str
 
 # setup logging
@@ -21,6 +23,8 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         self.seen_urls = set(ScrapedArticle.objects.all().values_list('url', flat=True))
         self.start_urls = [f'https://medium.com/tag/{tag}/archive/' for tag in tags]
+        self.IAGO_API_USER = os.getenv('IAGO_API_SCRAPY_USER')
+        self.IAGO_API_PASS = os.getenv('IAGO_API_SCRAPY_PASS')
 
     def start_requests(self):
         for url in self.start_urls:
@@ -126,7 +130,18 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
             if t['type'] == 'Tag':
                 article.tags.append(t['slug'])
 
-        # logger.info(f'SCRAPED {post["title"]}')
+        # do article AI processing, use Iago api
+        r = requests.get('https://api.iago.jeeny.ai/v0/skillspace/match', json={'texts': [article.content]}, auth=(self.IAGO_API_USER, self.IAGO_API_PASS))
+        if r.status_code == 200:
+            logger.info(f'IAGO processing complete for {article.title}')
+            article_ai_data = r.json()['results'][0]
+            article.embedding_all_mpnet_base_v2 = article_ai_data['vector']
+            article.save()
+            for skill in article_ai_data['skills']:
+                article.skills.add(Skill.objects.get(name=skill))
+        else:
+            logger.error(f'Iago API {r.status_code} {r.text}')
+            
         return {'article': article}
 
     def _post_302(self, response):

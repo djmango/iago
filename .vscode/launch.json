@@ -49,7 +49,7 @@
                 "crawl",
                 "medium",
                 "-a",
-                "tags=education"
+                "tags=graphic-design"
             ],
             "console": "integratedTerminal"
         },
