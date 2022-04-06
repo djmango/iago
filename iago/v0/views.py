@@ -287,9 +287,9 @@ class contentSkillSearch(views.APIView):
         # search content based on the skills
         start = time.perf_counter()
         if strict:
-            content = list(ScrapedArticle.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'updated_on'))
+            content = list(ScrapedArticle.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
         else:
-            content = list(ScrapedArticle.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'updated_on'))
+            content = list(ScrapedArticle.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
         logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         k = request.data['k'] if 'k' in request.data else len(content)

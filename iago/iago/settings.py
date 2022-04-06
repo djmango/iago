@@ -27,17 +27,14 @@ SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
-    logger.info('DJANGO SETTINGS IN DEBUG')
+    print('DJANGO SETTINGS IN DEBUG')
 else:
     DEBUG = False
-    logger.info('DJANGO SETTINGS IN PRODUCTION')
+    print('DJANGO SETTINGS IN PRODUCTION')
 
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
 CSRF_TRUSTED_ORIGINS = ['https://api.iago.jeeny.ai']
-
-# model names
-TOPIC_MODEL_NAME = 'topic_v0.10'
 
 # Application definition
 
@@ -106,7 +103,6 @@ GRAPH_MODELS = {
 
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
-
 
 # NOTE if the database is ever reset or migrated, ensure that this is done:
 # https://stackoverflow.com/questions/14292800/how-to-use-pg-trgm-after-postgresql-installation-from-source/14294609#14294609
