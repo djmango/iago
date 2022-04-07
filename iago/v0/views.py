@@ -15,7 +15,7 @@ from rest_framework import status, views
 from rest_framework.response import Response
 
 from v0 import ai, index, schemas
-from v0.models import Job, ScrapedArticle, Skill, Topic
+from v0.models import Job, Content, Skill, Topic
 from v0.serializers import TopicSerializerAll
 
 logger = logging.getLogger(__name__)
@@ -189,7 +189,7 @@ def transformArticles(articles):
         article.save()
 
 
-class transformScrapedArticles(views.APIView):
+class transformContents(views.APIView):
     """ transform all scraped articles and saves the embeddings """
     permission_classes = [HasGroupPermission]
     allowed_groups = {}
@@ -197,7 +197,7 @@ class transformScrapedArticles(views.APIView):
     def get(self, request):
         # get all articles with no embeddings
         start = time.perf_counter()
-        articles: list[ScrapedArticle] = list(ScrapedArticle.objects.filter(embedding_all_mpnet_base_v2__isnull=True))
+        articles: list[Content] = list(Content.objects.filter(embedding_all_mpnet_base_v2__isnull=True))
 
         # start transforming in a thread
         threading.Thread(target=transformArticles, name=f'transformArticles_{len(articles)}', args=[articles]).start()
@@ -208,7 +208,7 @@ def updateArticle(article_uuid):
     """ seperate function for job pooling """
     start = time.perf_counter()
 
-    article: ScrapedArticle = ScrapedArticle.objects.get(uuid=article_uuid)
+    article: Content = Content.objects.get(uuid=article_uuid)
 
     postID = article.url.split('/')[-1].split('-')[-1]
     r = requests.get(f'https://medium.com/_/api/posts/{postID}')
@@ -228,11 +228,11 @@ def updateArticle(article_uuid):
     logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
 
 
-def updateScrapedArticles():
+def updateContents():
     """ update scraped articles with their medium data """
 
     start = time.perf_counter()
-    articles_uuid = list(ScrapedArticle.objects.all().values_list('uuid', flat=True))
+    articles_uuid = list(Content.objects.all().values_list('uuid', flat=True))
     logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
     logger.info(f'Updating data for {len(articles_uuid)} articles')
 
@@ -287,9 +287,9 @@ class contentSkillSearch(views.APIView):
         # search content based on the skills
         start = time.perf_counter()
         if strict:
-            content = list(ScrapedArticle.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
+            content = list(Content.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
         else:
-            content = list(ScrapedArticle.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
+            content = list(Content.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'updated_on'))
         logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         k = request.data['k'] if 'k' in request.data else len(content)

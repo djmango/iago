@@ -47,7 +47,7 @@ class Skill(models.Model):
         return str(self.name)
 
 
-class ScrapedArticle(models.Model):
+class Content(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     url = models.URLField(max_length=800, unique=True)
     author = models.TextField()
@@ -63,6 +63,17 @@ class ScrapedArticle(models.Model):
     tags = models.JSONField(default=list)
     skills = models.ManyToManyField(Skill)
     popularity = models.JSONField(default=dict)
+
+    class types(models.TextChoices):
+        article = 'article'
+        video = 'video'
+        pdf = 'pdf'
+
+    type = models.CharField(
+        max_length=10,
+        choices=types.choices,
+        default=types.article,
+    )
 
     # embeddings
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)

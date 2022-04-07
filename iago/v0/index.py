@@ -10,7 +10,7 @@ from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import ScrapedArticle, Skill, Topic
+from v0.models import Content, Skill, Topic
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -148,5 +148,5 @@ scrapedarticle_index: VectorIndex
 skills_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    scrapedarticle_index = VectorIndex(ScrapedArticle.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+    scrapedarticle_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())

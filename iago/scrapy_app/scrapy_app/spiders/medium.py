@@ -5,7 +5,7 @@ import os
 
 import scrapy
 from bs4 import BeautifulSoup
-from v0.models import ScrapedArticle, Skill
+from v0.models import Content, Skill
 from v0.utils import clean_str
 
 # setup logging
@@ -21,7 +21,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
 
         tags = tags.split(',')
 
-        self.seen_urls = set(ScrapedArticle.objects.all().values_list('url', flat=True))
+        self.seen_urls = set(Content.objects.all().values_list('url', flat=True))
         self.start_urls = [f'https://medium.com/tag/{tag}/archive/' for tag in tags]
         self.IAGO_API_USER = os.getenv('IAGO_API_SCRAPY_USER')
         self.IAGO_API_PASS = os.getenv('IAGO_API_SCRAPY_PASS')
@@ -105,7 +105,7 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
             logger.info(f'BOUNCED {post["title"]} for majority non-english content')
             return
 
-        article = ScrapedArticle()
+        article = Content()
         article.url = response.meta.get('articleLink')
         article.title = post['title']
         # author is annoying
