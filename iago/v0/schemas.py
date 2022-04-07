@@ -39,10 +39,24 @@ queryKSchema = {
             "type": "string",
         },
         "k": {
-            "type": "integer"
+            "type": "integer",
+            "inclusiveMinimum": 0,
         }
     },
     "required": ["query"],
+}
+
+
+kSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "k": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+        }
+    },
+    "required": ["k"],
 }
 
 textsSchema = {

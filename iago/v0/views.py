@@ -15,8 +15,9 @@ from rest_framework import status, views
 from rest_framework.response import Response
 
 from v0 import ai, index, schemas
-from v0.models import Job, Content, Skill, Topic
+from v0.models import Content, Job, Skill, Topic
 from v0.serializers import TopicSerializerAll
+from v0.utils import clean_str
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ class transform(views.APIView):
 
         return Response({'vectors': vectors}, status=status.HTTP_200_OK)
 
+
 class matchSkills(views.APIView):
     """ take texts and return their embedding and related skills """
     permission_classes = [HasGroupPermission]
@@ -108,7 +110,7 @@ class matchSkills(views.APIView):
         # find skills for each text/vector and populate results
         for embed in embeds:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
+            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
 
             # add to results
             results.append({
@@ -136,7 +138,7 @@ class matchSkillsEmbeds(views.APIView):
         # find skills for each text/vector and populate results
         for embed in request.data['embeds']:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21) # NOTE these are hardcoded for now, important params if you want to change results
+            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
 
             # add to results
             results.append({
@@ -169,7 +171,7 @@ class adjacentSkills(views.APIView):
             if skill is not None:
                 # get adjacent skills for our skill
                 r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
-        
+
                 skills.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r]})
 
         return Response({'skills': skills}, status=status.HTTP_200_OK)
@@ -211,38 +213,90 @@ def updateArticle(article_uuid):
     article: Content = Content.objects.get(uuid=article_uuid)
 
     postID = article.url.split('/')[-1].split('-')[-1]
-    r = requests.get(f'https://medium.com/_/api/posts/{postID}')
-    data = json.loads(r.text[16:])
-    post = data['payload']['value']
-    logger.info(f'Call took {time.perf_counter()-start:.3f}s')
+    try:
+        r = requests.get(f'https://medium.com/_/api/posts/{postID}')
+        data = json.loads(r.text[16:])
 
-    skills: list[Skill] = index.skills_index.query_vector(article.embedding_all_mpnet_base_v2, k=10, min_distance=.21)
+        # if user deleted the article or their account then we mark it as deleted
+        if data['success'] == False:
+            logger.error(f'Failed to get article {article.url}, {data["error"]}')
+            if 'deleted' in data['error']: # though its possible we just got rate limited, so make sure to check the error
+                article.deleted = True
+                article.updated_on = Now()
+                article.save()
+            return
 
-    for skill, similarity in skills:
-        article.skills.add(skill)
+        post = data['payload']['value']
 
-    article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
+        article.url = post['mediumUrl']
+        article.title = post['title']
 
-    article.updated_on = Now()
-    article.save()
-    logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
+        # author is annoying
+        if 'references' in data['payload'] and 'User' in data['payload']['references']:
+            article.author = data['payload']['references']['User'].popitem()[1]['name']
+        elif '@' in article.url:
+            article.author = article.url.split('@')[1].split('/')[0]
+
+        article.subtitle = post['virtuals']['subtitle']
+        article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
+        article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60)
+        article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
+        article.provider = 'medium'
+
+        # concat paragraphs
+        paragraphs = []
+        for par in post['content']['bodyModel']['paragraphs']:
+            if par['type'] == 4:
+                if '.gif' in article.thumbnail: # we dont want gifs as preview, so if we happen to find an image to replace it in the body then we can use that instead
+                    article.thumbnail = f"https://miro.medium.com/{par['metadata']['id']}"
+            else:
+                paragraphs.append(clean_str(par['text']))
+
+        article.content = '\n\n'.join(paragraphs)
+
+        for t in post['virtuals']['tags']:
+            if t['type'] == 'Tag':
+                if t['slug'] not in article.tags:
+                    article.tags.append(t['slug'])
+
+        article.updated_on = Now()
+        article.save()
+        logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
+    except Exception as e:
+        logger.error(e)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
 
 
-def updateContents():
+class updateContents(views.APIView):
     """ update scraped articles with their medium data """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
 
-    start = time.perf_counter()
-    articles_uuid = list(Content.objects.all().values_list('uuid', flat=True))
-    logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
-    logger.info(f'Updating data for {len(articles_uuid)} articles')
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.kSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-    p = ThreadPool(processes=20)
-    p.map(updateArticle, articles_uuid)
-    p.close()
+        k = int(request.data['k'])
+
+        start = time.perf_counter()
+        articles_uuid = list(Content.objects.all().order_by('updated_on')[:k].values_list('uuid', flat=True))
+        logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
+        logger.info(f'Updating data for {len(articles_uuid)} articles')
+
+        p = ThreadPool(processes=5)
+        p.map_async(updateArticle, articles_uuid)
+
+        return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
 
 class skillSearch(views.APIView):
     permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
 
     def get(self, request):
         try:

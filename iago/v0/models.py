@@ -63,6 +63,7 @@ class Content(models.Model):
     tags = models.JSONField(default=list)
     skills = models.ManyToManyField(Skill)
     popularity = models.JSONField(default=dict)
+    deleted = models.BooleanField(default=False)
 
     class types(models.TextChoices):
         article = 'article'

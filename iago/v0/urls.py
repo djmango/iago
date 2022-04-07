@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 urlpatterns = [
     path('content/query', views.querySubmit.as_view()),
+    path('content/update', views.updateContents().as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('skillspace/search_skills', views.skillSearch.as_view()),
     path('skillspace/search_content', views.contentSkillSearch.as_view()),
@@ -24,6 +25,7 @@ urlpatterns = [
 # TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('oncedebug')
+    views.updateContents()
 
     # from v0.models import SkillCluster, Skill
     # from sentence_transformers import util
