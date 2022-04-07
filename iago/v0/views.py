@@ -243,6 +243,8 @@ def updateArticle(article_uuid):
         article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
         article.provider = 'medium'
 
+        # NOTE: this is an example of a medium article but its actually a video https://medium.com/@digitalprspctv/vsco-style-images-in-3-simple-steps-photoshop-4de7e74b29c8
+
         # concat paragraphs
         paragraphs = []
         for par in post['content']['bodyModel']['paragraphs']:
@@ -266,7 +268,7 @@ def updateArticle(article_uuid):
         logger.error(e)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
 
 
-class updateContents(views.APIView):
+class updateContent(views.APIView):
     """ update scraped articles with their medium data """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
@@ -292,7 +294,7 @@ class updateContents(views.APIView):
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
 
-class skillSearch(views.APIView):
+class searchSkills(views.APIView):
     permission_classes = [HasGroupPermission]
     allowed_groups = {
         'GET': ['express_api']
@@ -311,7 +313,7 @@ class skillSearch(views.APIView):
         return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
 
 
-class contentSkillSearch(views.APIView):
+class searchContent(views.APIView):
     """ search for content based on skills """
     permission_classes = [HasGroupPermission]
     allowed_groups = {
@@ -320,11 +322,15 @@ class contentSkillSearch(views.APIView):
 
     def get(self, request):
         try:
-            jsonschema.validate(request.data, schema=schemas.contentSkillsSearchSchema)
+            jsonschema.validate(request.data, schema=schemas.searchContentSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         strict = request.data['strict'] if 'strict' in request.data else False
+        type = request.data['type'] if 'type' in request.data else None
+        if type and type not in Content.types.__dict__.values():
+            return Response({'status': 'error', 'response': f'Invalid type {type}. Must be in {str(Content.types.__dict__.values())}'}, status=status.HTTP_400_BAD_REQUEST)
+        length = request.data['length'] if 'length' in request.data else None
 
         start = time.perf_counter()
         skills = []
@@ -336,14 +342,27 @@ class contentSkillSearch(views.APIView):
         logger.info(f'Skill search took {round(time.perf_counter() - start, 3)}s')
 
         if len(skills) == 0:
-            return Response({'WILL_WRITE_ERROR_LATER_NO_FOUND_SKILLS': []}, status=status.HTTP_200_OK)
+            return Response({'status': 'error', 'response': 'No matching skills found'}, status=status.HTTP_200_OK)
 
-        # search content based on the skills
+        # apply filters
         start = time.perf_counter()
+        # skills filter
         if strict:
-            content = list(Content.objects.filter(skills=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+            content = Content.objects.filter(skills=skills)
         else:
-            content = list(Content.objects.filter(skills__in=skills).values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+            content = Content.objects.filter(skills__in=skills)
+
+        # type filter
+        if type:
+            content = content.filter(type=type)
+
+        # length filter
+        if length:
+            content = content.filter(content_read_seconds__lte=length)
+
+        # perform the transaction
+        content = list(content.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+        
         logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         k = request.data['k'] if 'k' in request.data else len(content)

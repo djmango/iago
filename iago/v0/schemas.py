@@ -88,7 +88,7 @@ embedsSchema = {
     "required": ["embeds"],
 }
 
-contentSkillsSearchSchema = {
+searchContentSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -98,13 +98,20 @@ contentSkillsSearchSchema = {
                 "type": "string"
             }
         },
+        "type": {
+            "type": "string",
+        },
+        "length": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+        },
         "k": {
             "type": "integer"
         },
         "strict": {
             "type": "boolean"
         }
-        
+
     },
     "required": ["skills"],
 }
@@ -128,7 +135,7 @@ adjacentSkillsSchema = {
             "inclusiveMinimum": 0,
             "inclusiveMaximum": 100
         }
-        
+
     },
     "required": ["skills"],
 }
