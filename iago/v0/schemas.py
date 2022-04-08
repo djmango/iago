@@ -1,3 +1,4 @@
+from v0.models import Content
 
 querySubmissionSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -99,11 +100,22 @@ searchContentSchema = {
             }
         },
         "type": {
-            "type": "string",
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": vars(Content.types)['_member_names_'],
+                # "enum": ["article", "video", "pdf"]
+            }
         },
         "length": {
-            "type": "integer",
-            "exclusiveMinimum": 0
+            "type": "array",
+            "items": {
+                "type": "integer",
+                "uniqueItems": True,
+                "inclusiveMinimum": 0,
+                "minContains": 2,
+                "maxContains": 2
+            }
         },
         "k": {
             "type": "integer"
@@ -113,7 +125,7 @@ searchContentSchema = {
         }
 
     },
-    "required": ["skills"],
+    "required": ["skills", "type"],
 }
 
 

@@ -328,8 +328,6 @@ class searchContent(views.APIView):
 
         strict = request.data['strict'] if 'strict' in request.data else False
         type = request.data['type'] if 'type' in request.data else None
-        if type and type not in Content.types.__dict__.values():
-            return Response({'status': 'error', 'response': f'Invalid type {type}. Must be in {str(Content.types.__dict__.values())}'}, status=status.HTTP_400_BAD_REQUEST)
         length = request.data['length'] if 'length' in request.data else None
 
         start = time.perf_counter()
@@ -354,11 +352,11 @@ class searchContent(views.APIView):
 
         # type filter
         if type:
-            content = content.filter(type=type)
+            content = content.filter(type__in=type)
 
         # length filter
         if length:
-            content = content.filter(content_read_seconds__lte=length)
+            content = content.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
 
         # perform the transaction
         content = list(content.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
