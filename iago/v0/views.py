@@ -261,7 +261,9 @@ def updateArticle(article_uuid):
                 if t['slug'] not in article.tags:
                     article.tags.append(t['slug'])
 
-        article.updated_on = Now()
+        # we really hate gifs
+        if '.gif' in article.thumbnail:
+            article.thumbnail = None
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
     except Exception as e:
