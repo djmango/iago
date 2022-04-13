@@ -5,10 +5,12 @@ import threading
 import time
 from multiprocessing.pool import ThreadPool
 
+from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 import jsonschema
 import numpy as np
 import requests
 from django.contrib.postgres.search import TrigramSimilarity
+from django.core.cache import cache
 from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission
 from rest_framework import status, views
@@ -20,6 +22,7 @@ from v0.serializers import TopicSerializerAll
 from v0.utils import clean_str
 
 logger = logging.getLogger(__name__)
+logger.setLevel(LOGGING_LEVEL_MODULE)
 
 
 class querySubmit(views.APIView):
@@ -166,8 +169,11 @@ class adjacentSkills(views.APIView):
 
         skills = []
         # for each skill in the query, find its closest match in the skills database
-        for skill_name in request.data['skills']:
-            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
+        pool = ThreadPool(processes=MAX_DB_THREADS)
+        skills = pool.map(getSkill, request.data['skills'])
+        pool.close()
+
+        for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
                 r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
@@ -290,8 +296,8 @@ class updateContent(views.APIView):
         logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
         logger.info(f'Updating data for {len(articles_uuid)} articles')
 
-        p = ThreadPool(processes=5)
-        p.map_async(updateArticle, articles_uuid)
+        pool = ThreadPool(processes=5)
+        pool.map_async(updateArticle, articles_uuid)
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
@@ -314,6 +320,30 @@ class searchSkills(views.APIView):
         skills = Skill.objects.annotate(similarity=TrigramSimilarity('name', query)).filter(similarity__gt=0.3).order_by('-similarity')
         return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
 
+def getSkill(skill_name: str, no_cache = False) -> Skill:
+    """ Gets closest skill object to the given name
+
+    Args:
+        skill_name (str): Skill name to find closest match to
+
+    Returns:
+        Skill: Closest matched skill, from cache if available
+    """
+
+    # check if available in cache first
+    start = time.perf_counter()
+    skill_name_cachesafe = f"skill_trigram_{skill_name.lower().replace(' ', '_')}"
+    cached_skill = cache.get(skill_name_cachesafe)
+    if cached_skill and not no_cache: # if so do a simple pk lookup
+        skill: Skill = Skill.objects.get(name=cached_skill)
+        logger.debug(f'Get cache for {skill_name} took {time.perf_counter()-start:.3f}s')
+    else: # if not in cache, find the closest match using trigram and store the result in cache
+        skill: Skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
+        if skill is not None:
+            cache.set(skill_name_cachesafe, skill.name)
+        logger.debug(f'Trigram search and set cache for {skill_name} took {time.perf_counter()-start:.3f}s')
+
+    return skill
 
 class searchContent(views.APIView):
     """ search for content based on skills """
@@ -333,13 +363,13 @@ class searchContent(views.APIView):
         length = request.data['length'] if 'length' in request.data else None
 
         start = time.perf_counter()
-        skills = []
         # for each skill in the query, find its closest match in the skills database
-        for skill_name in request.data['skills']:
-            skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
-            if skill is not None:
-                skills.append(skill)
-        logger.info(f'Skill search took {round(time.perf_counter() - start, 3)}s')
+        pool = ThreadPool(processes=MAX_DB_THREADS)
+        skills = pool.map(getSkill, request.data['skills'])
+        pool.close()
+        skills = [x for x in skills if x is not None] # remove none values
+        
+        logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
 
         if len(skills) == 0:
             return Response({'status': 'error', 'response': 'No matching skills found'}, status=status.HTTP_200_OK)
@@ -363,7 +393,7 @@ class searchContent(views.APIView):
         # perform the transaction
         content = list(content.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
         
-        logger.info(f'Content search took {round(time.perf_counter() - start, 3)}s')
+        logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         k = request.data['k'] if 'k' in request.data else len(content)
         return Response({'content': content[:k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)

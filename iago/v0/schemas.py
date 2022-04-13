@@ -109,12 +109,12 @@ searchContentSchema = {
         },
         "length": {
             "type": "array",
+            "minContains": 2,
+            "maxContains": 2,
+            "uniqueItems": True,
             "items": {
                 "type": "integer",
-                "uniqueItems": True,
-                "inclusiveMinimum": 0,
-                "minContains": 2,
-                "maxContains": 2
+                "inclusiveMinimum": 0
             }
         },
         "k": {
