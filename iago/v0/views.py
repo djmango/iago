@@ -167,20 +167,20 @@ class adjacentSkills(views.APIView):
         k = request.data['k'] if 'k' in request.data else 25
         temperature = int(request.data['temperature'])/100 if 'temperature' in request.data else .21
 
-        skills = []
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
         skills = pool.map(getSkill, request.data['skills'])
         pool.close()
 
+        skills_result = []
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
                 r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
 
-                skills.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r]})
+                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r]})
 
-        return Response({'skills': skills}, status=status.HTTP_200_OK)
+        return Response({'skills': skills_result}, status=status.HTTP_200_OK)
 
 
 def transformArticles(articles):
