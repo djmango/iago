@@ -340,7 +340,7 @@ def getSkill(skill_name: str, no_cache = False) -> Skill:
     else: # if not in cache, find the closest match using trigram and store the result in cache
         skill: Skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
         if skill is not None:
-            cache.set(skill_name_cachesafe, skill.name)
+            cache.set(skill_name_cachesafe, skill.name, timeout=60*60*24*7) # 7 day timeout
         logger.debug(f'Trigram search and set cache for {skill_name} took {time.perf_counter()-start:.3f}s')
 
     return skill
