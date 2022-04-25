@@ -395,8 +395,9 @@ class searchContent(views.APIView):
         
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
-        k = request.data['k'] if 'k' in request.data else len(content)
-        return Response({'content': content[:k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+        k: int = request.data['k'] if 'k' in request.data else len(content)
+        page: int = request.data['page'] if 'page' in request.data else 0
+        return Response({'content': content[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

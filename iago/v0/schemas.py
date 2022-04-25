@@ -120,6 +120,10 @@ searchContentSchema = {
         "k": {
             "type": "integer"
         },
+        "page": {
+            "type": "integer",
+            "inclusiveMinimum": 0
+        },
         "strict": {
             "type": "boolean"
         }

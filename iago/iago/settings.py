@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+HERE = Path(__file__).parent
 
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
@@ -29,6 +30,8 @@ MAX_DB_THREADS = 16
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
     print('DJANGO SETTINGS IN DEBUG')
+    # import newrelic.agent
+    # newrelic.agent.initialize(HERE.parent/'newrelic.ini')
 else:
     DEBUG = False
     print('DJANGO SETTINGS IN PRODUCTION')
