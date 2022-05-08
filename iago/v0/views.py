@@ -178,7 +178,7 @@ class adjacentSkills(views.APIView):
                 # get adjacent skills for our skill
                 r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
 
-                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r]})
+                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r[1:]]})
 
         return Response({'skills': skills_result}, status=status.HTTP_200_OK)
 
