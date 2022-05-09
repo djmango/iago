@@ -42,7 +42,7 @@ class querySubmit(views.APIView):
         k = request.data['k'] if 'k' in request.data else 5
 
         if 'text' not in request.data:  # query our database of content
-            inference, vector = index.scrapedarticle_index.query(query, k=k)
+            inference, vector = index.content_index.query(query, k=k)
 
             # format for humans
             neu_inferences = []
@@ -176,7 +176,7 @@ class adjacentSkills(views.APIView):
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
-                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k, min_distance=temperature)
+                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature) # we have to add one to k because the first result is always going to be the provided skill itself
 
                 skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r[1:]]})
 
@@ -398,6 +398,51 @@ class searchContent(views.APIView):
         k: int = request.data['k'] if 'k' in request.data else len(content)
         page: int = request.data['page'] if 'page' in request.data else 0
         return Response({'content': content[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+
+class recomendContent(views.APIView):
+    """ generate recommendations for given a job title and content history """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.recomendContentSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        start = time.perf_counter()
+        # first match the free-form job title provided to one embedded in our database
+        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', request.data['position'])).filter(similarity__gt=0.3).order_by('-similarity')
+        job: Job = jobs.first()
+        logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
+
+        # next get content objects with the provided content history ids
+        content_history: list[Content] = []
+        for content_id in request.data['lastconsumedcontent']:
+            try:
+                content = Content.objects.get(uuid=content_id, deleted=False)
+                content_history.append(content)
+            except Content.DoesNotExist:
+                return Response({'status': 'error', 'response': f'Content with id {content_id} does not exist or has been deleted'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # now get the center of the content history embeddings
+        content_history_vectors = np.array([x.embedding_all_mpnet_base_v2 for x in content_history]).astype(np.float32)
+        content_history_center = np.average(content_history_vectors, axis=0)
+
+        # get the weights of job and history and compute the center of the recomendation in the embedding space
+        job_weight, history_weight = request.data['weights'] if 'weights' in request.data else [1, 1]
+        recomendation_center = np.average([np.array(job.embedding_all_mpnet_base_v2), content_history_center], axis=0, weights=[job_weight, history_weight])
+
+        # now get the closest k content to the recomendation center via our faiss index
+        k: int = request.data['k']
+        temperature = int(request.data['temperature']/100) if 'temperature' in request.data else 0
+        content_recommendations = index.content_index.query_vector(recomendation_center, k=k, min_distance=temperature)
+        content_recommendations_id = [x[0].uuid for x in content_recommendations]
+
+        logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
+        return Response({'content_recommendations': content_recommendations_id, 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

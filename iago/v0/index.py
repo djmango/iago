@@ -115,7 +115,7 @@ class VectorIndex():
         """ Find closest k matches for a given index, assumes vector is of same embedding model as the index
 
         Args:
-            vector (ndarray): The vector to find closest matches for
+            vector (ndarray): The vector to find closest matches for.
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance: (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
 
@@ -144,9 +144,9 @@ class VectorIndex():
         return results[:k]
 
 topic_index: VectorIndex
-scrapedarticle_index: VectorIndex
+content_index: VectorIndex
 skills_index: VectorIndex
+content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    scrapedarticle_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())

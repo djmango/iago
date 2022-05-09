@@ -10,6 +10,7 @@ urlpatterns = [
     path('content/query', views.querySubmit.as_view()),
     path('content/update', views.updateContent.as_view()),
     path('content/search', views.searchContent.as_view()),
+    path('content/recommend', views.recomendContent.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('skillspace/search', views.searchSkills.as_view()),
     path('skillspace/adjacent', views.adjacentSkills.as_view()),
