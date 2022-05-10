@@ -10,7 +10,6 @@ import jsonschema
 import numpy as np
 import requests
 from django.contrib.postgres.search import TrigramSimilarity
-from django.core.cache import cache
 from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission
 from rest_framework import status, views
@@ -19,7 +18,7 @@ from rest_framework.response import Response
 from v0 import ai, index, schemas
 from v0.models import Content, Job, Skill, Topic
 from v0.serializers import TopicSerializerAll
-from v0.utils import clean_str
+from v0.utils import clean_str, search_fuzzy_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -169,14 +168,14 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = pool.map(getSkill, request.data['skills'])
+        skills = pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])
         pool.close()
 
         skills_result = []
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
-                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature) # we have to add one to k because the first result is always going to be the provided skill itself
+                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
 
                 skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r[1:]]})
 
@@ -226,7 +225,7 @@ def updateArticle(article_uuid):
         # if user deleted the article or their account then we mark it as deleted
         if data['success'] == False:
             logger.error(f'Failed to get article {article.url}, {data["error"]}')
-            if 'deleted' in data['error']: # though its possible we just got rate limited, so make sure to check the error
+            if 'deleted' in data['error']:  # though its possible we just got rate limited, so make sure to check the error
                 article.deleted = True
                 article.updated_on = Now()
                 article.save()
@@ -255,7 +254,7 @@ def updateArticle(article_uuid):
         paragraphs = []
         for par in post['content']['bodyModel']['paragraphs']:
             if par['type'] == 4:
-                if '.gif' in article.thumbnail: # we dont want gifs as preview, so if we happen to find an image to replace it in the body then we can use that instead
+                if '.gif' in article.thumbnail:  # we dont want gifs as preview, so if we happen to find an image to replace it in the body then we can use that instead
                     article.thumbnail = f"https://miro.medium.com/{par['metadata']['id']}"
             else:
                 paragraphs.append(clean_str(par['text']))
@@ -320,30 +319,6 @@ class searchSkills(views.APIView):
         skills = Skill.objects.annotate(similarity=TrigramSimilarity('name', query)).filter(similarity__gt=0.3).order_by('-similarity')
         return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
 
-def getSkill(skill_name: str, no_cache = False) -> Skill:
-    """ Gets closest skill object to the given name
-
-    Args:
-        skill_name (str): Skill name to find closest match to
-
-    Returns:
-        Skill: Closest matched skill, from cache if available
-    """
-
-    # check if available in cache first
-    start = time.perf_counter()
-    skill_name_cachesafe = f"skill_trigram_{skill_name.lower().replace(' ', '_')}"
-    cached_skill = cache.get(skill_name_cachesafe)
-    if cached_skill and not no_cache: # if so do a simple pk lookup
-        skill: Skill = Skill.objects.get(name=cached_skill)
-        logger.debug(f'Get cache for {skill_name} took {time.perf_counter()-start:.3f}s')
-    else: # if not in cache, find the closest match using trigram and store the result in cache
-        skill: Skill = Skill.objects.annotate(similarity=TrigramSimilarity('name', skill_name)).filter(similarity__gt=0.7).order_by('-similarity').first()
-        if skill is not None:
-            cache.set(skill_name_cachesafe, skill.name, timeout=60*60*24*7) # 7 day timeout
-        logger.debug(f'Trigram search and set cache for {skill_name} took {time.perf_counter()-start:.3f}s')
-
-    return skill
 
 class searchContent(views.APIView):
     """ search for content based on skills """
@@ -365,10 +340,10 @@ class searchContent(views.APIView):
         start = time.perf_counter()
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = pool.map(getSkill, request.data['skills'])
+        skills = pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])
         pool.close()
-        skills = [x for x in skills if x is not None] # remove none values
-        
+        skills = [x for x in skills if x is not None]  # remove none values
+
         logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
 
         if len(skills) == 0:
@@ -392,12 +367,13 @@ class searchContent(views.APIView):
 
         # perform the transaction
         content = list(content.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
-        
+
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         k: int = request.data['k'] if 'k' in request.data else len(content)
         page: int = request.data['page'] if 'page' in request.data else 0
         return Response({'content': content[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+
 
 class recomendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
