@@ -390,9 +390,7 @@ class recomendContent(views.APIView):
 
         start = time.perf_counter()
         # first match the free-form job title provided to one embedded in our database
-        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', request.data['position'])).filter(similarity__gt=0.3).order_by('-similarity')
-        job: Job = jobs.first()
-        logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
+        job: Job = search_fuzzy_cache(Job, request.data['position'])
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []
@@ -435,8 +433,7 @@ class jobSkillMatch(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         start = time.perf_counter()
-        jobs = Job.objects.annotate(similarity=TrigramSimilarity('name', request.data['jobtitle'])).filter(similarity__gt=0.3).order_by('-similarity')
-        job: Job = jobs.first()
+        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])
         logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
 
         if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
