@@ -87,8 +87,9 @@ class VectorIndex():
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
 
         Returns:
-            results: list(Tuple(Model, similarity)): List of tuples, object from self.queryset and its similarity to the query, in descending order
-            queryVector (np.ndarray): embedding of the submitted query
+            tuple:
+                results: list(Tuple(Model, similarity)): List of tuples, object from self.queryset and its similarity to the query, in descending order
+                queryVector (np.ndarray): embedding of the submitted query
         """
         
         start = time.perf_counter()
@@ -146,7 +147,7 @@ class VectorIndex():
 topic_index: VectorIndex
 content_index: VectorIndex
 skills_index: VectorIndex
+content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())

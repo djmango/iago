@@ -97,12 +97,6 @@ searchContentSchema = {
             "type": "string",
             "description": "The title or skills to search for.",
         },
-        "title_similarity_filter": {
-            "type": "number",
-            "description": "The minimum trigram similarity score between searchtext and the content titles added to the return.",
-            "inclusiveMinimum": 0,
-            "inclusiveMaximum": 1,
-        },
         "skills": {
             "type": "array",
             "description": "The skills to look for in content.",
@@ -137,7 +131,7 @@ searchContentSchema = {
         },
         "page": {
             "type": "integer",
-            "description": "The page to return. Each page has k elements. Starts at 0.",
+            "description": "The page to return. Each page has k elements. Defaults to 0.",
             "inclusiveMinimum": 0
         },
         "strict": {
@@ -146,8 +140,8 @@ searchContentSchema = {
         }
 
     },
-    "required": ["type"],
-    "anyOf": [
+    "required": ["type", "k"],
+    "oneOf": [
         {"required": ["skills"]},
         {"required": ["searchtext"]}
     ]

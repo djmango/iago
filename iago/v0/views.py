@@ -333,48 +333,43 @@ class searchContent(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        query = request.data['searchtext'] if 'searchtext' in request.data else None
+        # required
+        type = request.data['type']
+        k: int = request.data['k']
+        # oneOf
+        query_string = request.data['searchtext'] if 'searchtext' in request.data else None
+        query_skills = request.data['skills'] if 'skills' in request.data else None
+        # optional
         strict = request.data['strict'] if 'strict' in request.data else False
-        type = request.data['type'] if 'type' in request.data else None
         length = request.data['length'] if 'length' in request.data else None
-        title_similarity_filter = request.data['title_similarity_filter'] if 'title_similarity_filter' in request.data else 0.5
-        content_to_return = Content.objects.none() # we want to return an empty queryset to allow concat with | operator - https://stackoverflow.com/questions/431628/how-can-i-combine-two-or-more-querysets-in-a-django-view
+        page: int = request.data['page'] if 'page' in request.data else 0
+
+        content_to_return = Content.objects.none()
         skills = []
 
         start = time.perf_counter()
 
         # if we have a query then we want to search content titles for it
-        if query:
-            # content = Content.objects.annotate(similarity=TrigramSimilarity('title', query)).filter(similarity__gt=0.5).order_by('-similarity')
-            # https://docs.djangoproject.com/en/4.0/ref/models/querysets/#django.db.models.query.QuerySet.distinct
-            # cant use order_by with distinct
-            content = Content.objects.annotate(similarity=TrigramSimilarity('title', query)).filter(similarity__gt=title_similarity_filter)
-            content_to_return |= content
+        if query_string:
+            results = index.content_index.query(query_string, k=k)[0]
+            results_id = [x[0].uuid for x in results]
+            content_to_return |= Content.objects.filter(uuid__in=results_id)
 
-            skills.append(search_fuzzy_cache(Skill, query)) # also the user might be quering a skill tag. honestly not a good paradigm to be mixing title and skill search i think but whatever its mvp and decision is not mine to make
-
-        # if we have skills provided, for each skill in the query, find its closest match in the skills database
-        if 'skills' in request.data:
+        # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
+        elif query_skills:
             pool = ThreadPool(processes=MAX_DB_THREADS)
-            skills.extend(pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]))
+            skills.extend(pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]))
             pool.close()
             logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
+            skills = [x for x in skills if x is not None]  # remove none values
 
-        skills = [x for x in skills if x is not None]  # remove none values
-        if len(skills) == 0 and len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
+            # skills tag search
+            if strict and len(skills) > 0:
+                content_to_return |= Content.objects.filter(skills=skills)
+            elif len(skills) > 0:
+                content_to_return |= Content.objects.filter(skills__in=skills)
 
-        # skills tag search
-        if strict and len(skills) > 0:
-            content = Content.objects.filter(skills=skills)
-            content_to_return |= content
-        elif len(skills) > 0:
-            content = Content.objects.filter(skills__in=skills)
-            content_to_return |= content
-
-        # apply filters
-        # if DEBUG:
-        #     logger.debug(f'{len(content_to_return)} contents before filters')
+        # apply filters to content_to_return queryset
         # type filter
         content_to_return = content_to_return.filter(type__in=type)
 
@@ -386,17 +381,15 @@ class searchContent(views.APIView):
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
-        # if DEBUG:
-        #     logger.debug(f'{len(content_to_return)} contents after filters')
         # perform the transaction
         content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
-        print(len(content_to_return))
 
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
-        k: int = request.data['k'] if 'k' in request.data else len(content_to_return)
-        page: int = request.data['page'] if 'page' in request.data else 0
-        return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+        if len(content_to_return) == 0:
+            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+        else:
+            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
 class recomendContent(views.APIView):
