@@ -93,24 +93,37 @@ searchContentSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
+        "searchtext": {
+            "type": "string",
+            "description": "The title or skills to search for.",
+        },
+        "title_similarity_filter": {
+            "type": "number",
+            "description": "The minimum trigram similarity score between searchtext and the content titles added to the return.",
+            "inclusiveMinimum": 0,
+            "inclusiveMaximum": 1,
+        },
         "skills": {
             "type": "array",
+            "description": "The skills to look for in content.",
             "items": {
                 "type": "string"
             }
         },
         "type": {
             "type": "array",
+            "description": "The types of content to allow in result.",
             "items": {
                 "type": "string",
-                "enum": vars(Content.types)['_member_names_'],
+                "enum": vars(Content.types)["_member_names_"],
                 # "enum": ["article", "video", "pdf"]
             }
         },
         "length": {
             "type": "array",
-            "minContains": 2,
-            "maxContains": 2,
+            "description": "Min and a max read length in seconds filter.",
+            "minItems": 2,
+            "maxItems": 2,
             "uniqueItems": True,
             "items": {
                 "type": "integer",
@@ -124,14 +137,20 @@ searchContentSchema = {
         },
         "page": {
             "type": "integer",
+            "description": "The page to return. Each page has k elements. Starts at 0.",
             "inclusiveMinimum": 0
         },
         "strict": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "If true, only return content that matches ALL skills provided, assuming the skill exists in the database.",
         }
 
     },
-    "required": ["skills", "type"],
+    "required": ["type"],
+    "anyOf": [
+        {"required": ["skills"]},
+        {"required": ["searchtext"]}
+    ]
 }
 
 

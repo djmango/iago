@@ -51,7 +51,7 @@ def is_valid_json(s: str):
     except ValueError:
         return False
 
-
+# TODO: make an option for caching n results instead of just top
 def search_fuzzy_cache(model: models.Model, name: str, no_cache=False):
     """ Gets closest queryset object to the given name
 

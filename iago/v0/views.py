@@ -5,13 +5,13 @@ import threading
 import time
 from multiprocessing.pool import ThreadPool
 
-from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 import jsonschema
 import numpy as np
 import requests
 from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission
+from iago.settings import DEBUG, LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 from rest_framework import status, views
 from rest_framework.response import Response
 
@@ -333,46 +333,70 @@ class searchContent(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
+        query = request.data['searchtext'] if 'searchtext' in request.data else None
         strict = request.data['strict'] if 'strict' in request.data else False
         type = request.data['type'] if 'type' in request.data else None
         length = request.data['length'] if 'length' in request.data else None
+        title_similarity_filter = request.data['title_similarity_filter'] if 'title_similarity_filter' in request.data else 0.5
+        content_to_return = Content.objects.none() # we want to return an empty queryset to allow concat with | operator - https://stackoverflow.com/questions/431628/how-can-i-combine-two-or-more-querysets-in-a-django-view
+        skills = []
 
         start = time.perf_counter()
-        # for each skill in the query, find its closest match in the skills database
-        pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])
-        pool.close()
+
+        # if we have a query then we want to search content titles for it
+        if query:
+            # content = Content.objects.annotate(similarity=TrigramSimilarity('title', query)).filter(similarity__gt=0.5).order_by('-similarity')
+            # https://docs.djangoproject.com/en/4.0/ref/models/querysets/#django.db.models.query.QuerySet.distinct
+            # cant use order_by with distinct
+            content = Content.objects.annotate(similarity=TrigramSimilarity('title', query)).filter(similarity__gt=title_similarity_filter)
+            content_to_return |= content
+
+            skills.append(search_fuzzy_cache(Skill, query)) # also the user might be quering a skill tag. honestly not a good paradigm to be mixing title and skill search i think but whatever its mvp and decision is not mine to make
+
+        # if we have skills provided, for each skill in the query, find its closest match in the skills database
+        if 'skills' in request.data:
+            pool = ThreadPool(processes=MAX_DB_THREADS)
+            skills.extend(pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]))
+            pool.close()
+            logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
+
         skills = [x for x in skills if x is not None]  # remove none values
+        if len(skills) == 0 and len(content_to_return) == 0:
+            return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
 
-        logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
-
-        if len(skills) == 0:
-            return Response({'status': 'error', 'response': 'No matching skills found'}, status=status.HTTP_200_OK)
+        # skills tag search
+        if strict and len(skills) > 0:
+            content = Content.objects.filter(skills=skills)
+            content_to_return |= content
+        elif len(skills) > 0:
+            content = Content.objects.filter(skills__in=skills)
+            content_to_return |= content
 
         # apply filters
-        start = time.perf_counter()
-        # skills filter
-        if strict:
-            content = Content.objects.filter(skills=skills)
-        else:
-            content = Content.objects.filter(skills__in=skills)
-
+        # if DEBUG:
+        #     logger.debug(f'{len(content_to_return)} contents before filters')
         # type filter
-        if type:
-            content = content.filter(type__in=type)
+        content_to_return = content_to_return.filter(type__in=type)
 
         # length filter
         if length:
-            content = content.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
+            # TODO: there might be a way to get a slice of a queryset so we don't have to perform the full db transaction? now that i think of it maybe not but there is potential for optimizing with the k and page vars
+            content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
 
+        # unique filter
+        content_to_return = content_to_return.distinct('uuid')
+
+        # if DEBUG:
+        #     logger.debug(f'{len(content_to_return)} contents after filters')
         # perform the transaction
-        content = list(content.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+        content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+        print(len(content_to_return))
 
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
-        k: int = request.data['k'] if 'k' in request.data else len(content)
+        k: int = request.data['k'] if 'k' in request.data else len(content_to_return)
         page: int = request.data['page'] if 'page' in request.data else 0
-        return Response({'content': content[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+        return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
 class recomendContent(views.APIView):
