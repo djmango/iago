@@ -351,7 +351,7 @@ class searchContent(views.APIView):
 
         # if we have a query then we want to search content titles for it
         if query_string:
-            results = index.content_index.query(query_string, k=k)[0]
+            results = index.content_index.query(query_string, k=k*(page+2))[0] # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
             results_id = [x[0].uuid for x in results]
             content_to_return |= Content.objects.filter(uuid__in=results_id)
 
