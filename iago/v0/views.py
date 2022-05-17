@@ -112,7 +112,7 @@ class matchSkills(views.APIView):
         # find skills for each text/vector and populate results
         for embed in embeds:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills: list[Skill] = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
 
             # add to results
             results.append({
@@ -140,7 +140,7 @@ class matchSkillsEmbeds(views.APIView):
         # find skills for each text/vector and populate results
         for embed in request.data['embeds']:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query_vector(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills: list[Skill] = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
 
             # add to results
             results.append({
@@ -164,7 +164,7 @@ class adjacentSkills(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         k = request.data['k'] if 'k' in request.data else 25
-        temperature = int(request.data['temperature'])/100 if 'temperature' in request.data else .21
+        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else .21
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
@@ -175,7 +175,7 @@ class adjacentSkills(views.APIView):
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
-                r = index.skills_index.query_vector(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
+                r = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
 
                 skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r[1:]]})
 
@@ -334,7 +334,7 @@ class searchContent(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # required
-        type = request.data['type']
+        content_type = request.data['type']
         k: int = request.data['k']
         # oneOf
         query_string = request.data['searchtext'] if 'searchtext' in request.data else None
@@ -351,9 +351,7 @@ class searchContent(views.APIView):
 
         # if we have a query then we want to search content titles for it
         if query_string:
-            results = index.content_index.query(query_string, k=k*(page+2))[0] # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
-            results_id = [x[0].uuid for x in results]
-            content_to_return |= Content.objects.filter(uuid__in=results_id)
+            content_to_return |= index.content_index.query(query_string, k=k*(page+2), return_queryset=True) # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
@@ -371,11 +369,10 @@ class searchContent(views.APIView):
 
         # apply filters to content_to_return queryset
         # type filter
-        content_to_return = content_to_return.filter(type__in=type)
+        content_to_return = content_to_return.filter(type__in=content_type)
 
         # length filter
         if length:
-            # TODO: there might be a way to get a slice of a queryset so we don't have to perform the full db transaction? now that i think of it maybe not but there is potential for optimizing with the k and page vars
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
 
         # unique filter
@@ -428,12 +425,29 @@ class recomendContent(views.APIView):
 
         # now get the closest k content to the recomendation center via our faiss index
         k: int = request.data['k']
-        temperature = int(request.data['temperature']/100) if 'temperature' in request.data else 0
-        content_recommendations = index.content_index.query_vector(recomendation_center, k=k, min_distance=temperature)
-        content_recommendations_id = [x[0].uuid for x in content_recommendations]
+        page: int = request.data['page'] if 'page' in request.data else 0
+        temperature = float(request.data['temperature']/100) if 'temperature' in request.data else 0
+        content_to_return = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature, return_queryset=True)
+        
+        # apply filters
+        content_type = request.data['type'] if 'type' in request.data else None
+        length = request.data['length'] if 'length' in request.data else None
+        # type filter
+        if content_type:
+            content_to_return = content_to_return.filter(type__in=content_type)
+
+        # length filter
+        if length:
+            content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
+
+        # unique filter
+        content_to_return = content_to_return.distinct('uuid')
+
+        # evaluate the queryset and get the ids
+        content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
 
         logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
-        return Response({'content_recommendations': content_recommendations_id, 'matched_job': job.name}, status=status.HTTP_200_OK)
+        return Response({'content_recommendations': content_to_return_ids[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):
@@ -459,7 +473,7 @@ class jobSkillMatch(views.APIView):
 
         # search index
         start = time.perf_counter()
-        results = index.skills_index.query_vector(np.array(job.embedding_all_mpnet_base_v2), k)
+        results = index.skills_index.query(np.array(job.embedding_all_mpnet_base_v2), k)
         skills = [str(result[0].name) for result in results]
         logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
 

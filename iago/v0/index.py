@@ -36,7 +36,9 @@ class VectorIndex():
 
         # either get or generate vectors
         if type(self.iterable) == QuerySet:
-            self.vectors = np.array(list(self.iterable.values_list('embedding_all_mpnet_base_v2', flat=True))).astype(np.float32)
+            # https://stackoverflow.com/questions/7558908/unpacking-a-list-tuple-of-pairs-into-two-lists-tuples
+            self.pks, self.vectors = zip(*list(self.iterable.values_list('pk', 'embedding_all_mpnet_base_v2')))
+            self.vectors = np.array(self.vectors).astype(np.float32)
         else:
             self.vectors = self.embedding_model.encode(self.iterable).astype(np.float32)
 
@@ -44,15 +46,15 @@ class VectorIndex():
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
 
 
-    def _min_distance(self, indices: list, min_distance: float):
-        """ Find closest k matches with a minimum distance between matches for a given index, assumes vector is of same embedding model as the index
+    def _min_distance(self, indices: list[int], min_distance: float):
+        """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
 
         Args:
-            indices (list): List if index values of the embeddings to ensure min_distance between
+            indices (list): List of index values of the embeddings to ensure min_distance between
             min_distance (float,): Minimum distance between embeddings. Ranges from 0 to 1, 0 returning all results and 1 returning none.
 
         Returns:
-            results list(Tuple(Topic_id, similarity)): List of tuples, object from self.queryset and its similarity to the query_vector, in descending order
+            results list([int]): List of indexes that are outside the min_distance
         """
 
         start = time.perf_counter()
@@ -78,22 +80,35 @@ class VectorIndex():
 
         return cleaned_indices
 
-    def query(self, query: str, k: int = 1, min_distance: float = 0.0):
-        """ Find closest k matches for a given query using semantic embedding_model
+    def query(self, query: str, k: int = 1, min_distance: float = 0.0, return_queryset: bool = False):
+        """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
-            query (str): The string to find closest matches for
+            query (str, list, np.ndarray): The string or embedding vector to find closest matches for
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
+            return_queryset (bool, optional): Return the lazy-loading queryset of results instead of a list of objects. Defaults to False.
 
         Returns:
-            tuple:
-                results: list(Tuple(Model, similarity)): List of tuples, object from self.queryset and its similarity to the query, in descending order
-                queryVector (np.ndarray): embedding of the submitted query
+            results: list(Tuple(Model, similarity)): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
+            queryVector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray
         """
         
         start = time.perf_counter()
-        query_vector = self.embedding_model.encode([query])
+
+        if return_queryset and type(self.iterable) != QuerySet:
+            raise ValueError('return_queryset is only supported for queryset indexes')
+
+        if type(query) == str:
+            query_vector = self.embedding_model.encode([query])
+        elif type(query) == np.ndarray:
+            query_vector = np.array([query]).astype(np.float32)
+        elif type(query) == list:
+            if len(query) != self.d:
+                raise ValueError(f'Query vector must be of length {self.d}')
+            query_vector = np.array([query]).astype(np.float32)
+        else:
+            raise ValueError('Query must be a str, list, or np.ndarray')
 
         if min_distance > 0: # if we want to filter results then we must get extra results initially to satisfy k
             p = 10
@@ -106,48 +121,24 @@ class VectorIndex():
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:
             cleaned_indices = self._min_distance(indices, min_distance)
-            results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], cleaned_indices)]
         else:
-            results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], indices.tolist()[0])]  # 0 because query_vector is a list of 1 element
+            cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
         
-        return results[:k], query_vector[0]
-
-    def query_vector(self, query_vector: np.ndarray, k: int = 1, min_distance: float = 0.0):
-        """ Find closest k matches for a given index, assumes vector is of same embedding model as the index
-
-        Args:
-            vector (ndarray): The vector to find closest matches for.
-            k (int, optional): Number of results to return. Defaults to 1.
-            min_distance: (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
-
-        Returns:
-            results: list(Tuple(Model, similarity)): List of tuples, object from self.queryset and its similarity to the query_vector, in descending order
-        """
-
-        start = time.perf_counter()
-        query_vector = np.array([query_vector]).astype(np.float32)
-
-        if min_distance > 0: # if we want to filter results then we must get extra results initially to satisfy k
-            p = 10
+        if return_queryset: # if this is true only return a lazy loading queryset
+            results: QuerySet = self.iterable.filter(pk__in=[self.pks[x] for x in cleaned_indices])
+            return results
         else:
-            p = 1
-
-        values, indices = self.index.search(query_vector, k*p)
-        self.logger.info(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
-
-        # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
-        if min_distance > 0:
-            cleaned_indices = self._min_distance(indices, min_distance)
             results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], cleaned_indices)]
+
+        if type(query) == str: # only return the encoded vector if it was not originally provided
+            return results[:k], query_vector[0]
         else:
-            results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], indices.tolist()[0])]  # 0 because query_vector is a list of 1 element
-        
-        return results[:k]
+            return results[:k]
 
 topic_index: VectorIndex
-content_index: VectorIndex
 skills_index: VectorIndex
-content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+content_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     skills_index = VectorIndex(Skill.objects.all())
+content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))

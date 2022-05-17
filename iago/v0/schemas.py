@@ -110,7 +110,6 @@ searchContentSchema = {
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
-                # "enum": ["article", "video", "pdf"]
             }
         },
         "length": {
@@ -197,6 +196,30 @@ recomendContentSchema = {
             "type": "integer",
             "description": "The number of recommendations to return.",
             "exclusiveMinimum": 0
+        },
+        "page": {
+            "type": "integer",
+            "description": "The page to return. Each page has k elements. Defaults to 0.",
+            "inclusiveMinimum": 0
+        },
+        "type": {
+            "type": "array",
+            "description": "The types of content to allow in result.",
+            "items": {
+                "type": "string",
+                "enum": vars(Content.types)["_member_names_"],
+            }
+        },
+        "length": {
+            "type": "array",
+            "description": "Min and a max read length in seconds filter.",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": True,
+            "items": {
+                "type": "integer",
+                "inclusiveMinimum": 0
+            }
         },
         "weights": {
             "type": "array",
