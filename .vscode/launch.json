@@ -22,6 +22,9 @@
                 "runserver",
                 "--noreload"
             ],
+            "env": {
+                "GEVENT_SUPPORT": "False"
+            },
             "django": true
         },
         {

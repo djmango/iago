@@ -20,7 +20,7 @@ services:
             context: ./nginx
             dockerfile: Dockerfile
         ports:
-            - 80:80
+            - 8000:80
         restart: unless-stopped
         depends_on:
             - django

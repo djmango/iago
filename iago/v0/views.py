@@ -343,10 +343,13 @@ class searchContent(views.APIView):
 
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
         content_to_return_ids = [x['uuid'] for x in content_to_return]
-        content_to_return_ranked = []
-        for content_id, score in rankings:
-            if content_id in content_to_return_ids:
-                content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
+        if query_string:
+            content_to_return_ranked = []
+            for content_id, score in rankings:
+                if content_id in content_to_return_ids:
+                    content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
+        else:
+            content_to_return_ranked = content_to_return_ids
 
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
