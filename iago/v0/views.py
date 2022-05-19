@@ -65,7 +65,7 @@ class matchSkills(views.APIView):
         for embed in embeds:
             # find the closest skills
             skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = zip(*rankings)[0] # rankings are keyed by pk which in skill objects case is the name
+            skills_ranked = list(zip(*rankings))[0] # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
@@ -95,7 +95,7 @@ class matchSkillsEmbeds(views.APIView):
         for embed in request.data['embeds']:
             # find the closest skills
             skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = zip(*rankings)[0] # rankings are keyed by pk which in skill objects case is the name
+            skills_ranked = list(zip(*rankings))[0] # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
@@ -131,7 +131,7 @@ class adjacentSkills(views.APIView):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
-                skills_ranked = zip(*rankings)[0]
+                skills_ranked = list(zip(*rankings))[0]
 
                 skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
 
@@ -452,7 +452,7 @@ class jobSkillMatch(views.APIView):
         start = time.perf_counter()
         
         results, rankings, query_vector = index.skills_index.query(job.embedding_all_mpnet_base_v2, k=k)
-        skills_ranked = zip(*rankings)[0]
+        skills_ranked = list(zip(*rankings))[0]
         logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
 
         return Response({'jobtitle': str(job.name), 'skills': skills_ranked}, status=status.HTTP_200_OK)
