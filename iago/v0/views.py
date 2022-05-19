@@ -349,7 +349,7 @@ class searchContent(views.APIView):
                 if content_id in content_to_return_ids:
                     content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
         else:
-            content_to_return_ranked = content_to_return_ids
+            content_to_return_ranked = content_to_return
 
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
