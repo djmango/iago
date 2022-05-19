@@ -40,7 +40,7 @@ class VectorIndex():
             self.pks, self.vectors = zip(*list(self.iterable.values_list('pk', 'embedding_all_mpnet_base_v2')))
             self.vectors = np.array(self.vectors).astype(np.float32)
         else:
-            self.vectors = self.embedding_model.encode(self.iterable).astype(np.float32)
+            raise ValueError('VectorIndex supported for non-queryset iterables is deprecated')
 
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
@@ -80,27 +80,24 @@ class VectorIndex():
 
         return cleaned_indices
 
-    def query(self, query: str, k: int = 1, min_distance: float = 0.0, return_queryset: bool = False):
+    def query(self, query: str, k: int = 1, min_distance: float = 0.0):
         """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
             query (str, list, np.ndarray): The string or embedding vector to find closest matches for
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
-            return_queryset (bool, optional): Return the lazy-loading queryset of results instead of a list of objects. Defaults to False.
 
         Returns:
-            results: list(Tuple(Model, similarity)): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
-            queryVector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray
+            results: (QuerySet): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
+            rankings: (list): List of tuples, pk and similarity to the query pairs, in descending order
+            query_vector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray
         """
         
         start = time.perf_counter()
 
-        if return_queryset and type(self.iterable) != QuerySet:
-            raise ValueError('return_queryset is only supported for queryset indexes')
-
         if type(query) == str:
-            query_vector = self.embedding_model.encode([query])
+            query_vector = np.array(self.embedding_model.encode([query])).astype(np.float32)
         elif type(query) == np.ndarray:
             query_vector = np.array([query]).astype(np.float32)
         elif type(query) == list:
@@ -124,16 +121,9 @@ class VectorIndex():
         else:
             cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
         
-        if return_queryset: # if this is true only return a lazy loading queryset
-            results: QuerySet = self.iterable.filter(pk__in=[self.pks[x] for x in cleaned_indices])
-            return results
-        else:
-            results = [(self.iterable[indice], value) for value, indice in zip(values.tolist()[0], cleaned_indices)]
-
-        if type(query) == str: # only return the encoded vector if it was not originally provided
-            return results[:k], query_vector[0]
-        else:
-            return results[:k]
+        results: QuerySet = self.iterable.filter(pk__in=[self.pks[x] for x in cleaned_indices])
+        rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, values.tolist()[0])]
+        return results, rankings, query_vector
 
 topic_index: VectorIndex
 skills_index: VectorIndex

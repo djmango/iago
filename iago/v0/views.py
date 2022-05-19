@@ -9,6 +9,7 @@ import jsonschema
 import numpy as np
 import requests
 from django.contrib.postgres.search import TrigramSimilarity
+from django.db.models import Q
 from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission
 from iago.settings import DEBUG, LOGGING_LEVEL_MODULE, MAX_DB_THREADS
@@ -22,55 +23,6 @@ from v0.utils import clean_str, search_fuzzy_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
-
-
-class querySubmit(views.APIView):
-    """ get related articles to the submitted query """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'POST': ['express_api']
-    }
-
-    def post(self, request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.querySubmissionSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        query = request.data['query']
-        k = request.data['k'] if 'k' in request.data else 5
-
-        if 'text' not in request.data:  # query our database of content
-            inference, vector = index.content_index.query(query, k=k)
-
-            # format for humans
-            neu_inferences = []
-            for content, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
-                structured_topic = {
-                    'name': str(content),  # title of the content
-                    'url': str(content.url_response),  # url of the content
-                    'probability': probability  # probablity of the inference being correct
-                }
-                neu_inferences.append(structured_topic)
-
-        else:  # query the provided text
-            # we will just split by sentences for now
-            texts = [str(s) for s in re.split(r"(?<!^)\s*[.\n]+\s*(?!$)", request.data['text'])]
-
-            # encode
-            request_index = index.VectorIndex(texts)
-            inference, vector = request_index.query(query, k=k)
-
-            # format for humans
-            neu_inferences = []
-            for snippet, probability in inference:  # iterate through our inferences list and structure the data so that its easy for humans to analyze
-                structured_topic = {
-                    'snippet': snippet,  # snippet that was matched
-                    'probability': probability  # probablity of the inference being correct
-                }
-                neu_inferences.append(structured_topic)
-
-        return Response({'inference': neu_inferences}, status=status.HTTP_200_OK)
 
 
 class transform(views.APIView):
@@ -112,16 +64,18 @@ class matchSkills(views.APIView):
         # find skills for each text/vector and populate results
         for embed in embeds:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills_ranked = zip(*rankings)[0] # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
-                'skills': [x[0].name for x in skills],
+                'skills': skills_ranked,
                 'embed': embed.tolist()
             })
 
         return Response({'results': results}, status=status.HTTP_200_OK)
 
+# TODO: merge these two functions
 
 class matchSkillsEmbeds(views.APIView):
     """ take embeds return their related skills """
@@ -140,11 +94,12 @@ class matchSkillsEmbeds(views.APIView):
         # find skills for each text/vector and populate results
         for embed in request.data['embeds']:
             # find the closest skills
-            skills: list[Skill] = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills_ranked = zip(*rankings)[0] # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
-                'skills': [x[0].name for x in skills]
+                'skills': skills_ranked
             })
 
         return Response({'results': results}, status=status.HTTP_200_OK)
@@ -175,9 +130,10 @@ class adjacentSkills(views.APIView):
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
-                r = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
+                results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
+                skills_ranked = zip(*rankings)[0]
 
-                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': [x[0].name for x in r[1:]]})
+                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
 
         return Response({'skills': skills_result}, status=status.HTTP_200_OK)
 
@@ -351,7 +307,8 @@ class searchContent(views.APIView):
 
         # if we have a query then we want to search content titles for it
         if query_string:
-            content_to_return |= index.content_index.query(query_string, k=k*(page+2), return_queryset=True) # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
+            results, rankings, query_vector = index.content_index.query(query_string, k=k*(page+2)) # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
+            content_to_return |= results
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
@@ -375,18 +332,28 @@ class searchContent(views.APIView):
         if length:
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
 
+        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
+        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
+
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
         # perform the transaction
         content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
 
+        # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
+        content_to_return_ids = [x['uuid'] for x in content_to_return]
+        content_to_return_ranked = []
+        for content_id, score in rankings:
+            if content_id in content_to_return_ids:
+                content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
+
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         if len(content_to_return) == 0:
             return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
         else:
-            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+            return Response({'content': content_to_return_ranked[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
 class recomendContent(views.APIView):
@@ -427,7 +394,8 @@ class recomendContent(views.APIView):
         k: int = request.data['k']
         page: int = request.data['page'] if 'page' in request.data else 0
         temperature = float(request.data['temperature']/100) if 'temperature' in request.data else 0
-        content_to_return = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature, return_queryset=True)
+        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature)
+        content_to_return = results
         
         # apply filters
         content_type = request.data['type'] if 'type' in request.data else None
@@ -440,14 +408,23 @@ class recomendContent(views.APIView):
         if length:
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
 
+        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
+        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
+
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
         # evaluate the queryset and get the ids
         content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
 
+        # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
+        content_to_return_ranked = []
+        for content_id, score in rankings:
+            if content_id in content_to_return_ids:
+                content_to_return_ranked.append(content_id)
+
         logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
-        return Response({'content_recommendations': content_to_return_ids[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
+        return Response({'content_recommendations': content_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):
@@ -473,11 +450,12 @@ class jobSkillMatch(views.APIView):
 
         # search index
         start = time.perf_counter()
-        results = index.skills_index.query(np.array(job.embedding_all_mpnet_base_v2), k)
-        skills = [str(result[0].name) for result in results]
+        
+        results, rankings, query_vector = index.skills_index.query(job.embedding_all_mpnet_base_v2, k=k)
+        skills_ranked = zip(*rankings)[0]
         logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
 
-        return Response({'jobtitle': str(job.name), 'skills': skills}, status=status.HTTP_200_OK)
+        return Response({'jobtitle': str(job.name), 'skills': skills_ranked}, status=status.HTTP_200_OK)
 
 # Topic CRUD class views
 
