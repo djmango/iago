@@ -418,16 +418,16 @@ class recomendContent(views.APIView):
         content_to_return = content_to_return.distinct('uuid')
 
         # evaluate the queryset and get the ids
-        content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
+        content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
 
-        # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
-        content_to_return_ranked = []
-        for content_id, score in rankings:
-            if content_id in content_to_return_ids:
-                content_to_return_ranked.append(content_id)
+        # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
+        content_ids_to_return_ranked = []
+        for content_id_ranked, score in rankings:
+            if content_id_ranked in content_ids_to_return: # ensure the result passed our filters
+                content_ids_to_return_ranked.append(content_id_ranked)
 
         logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
-        return Response({'content_recommendations': content_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
+        return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

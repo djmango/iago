@@ -41,20 +41,35 @@ class Skill(StringEmbedding):
     cluster = models.ForeignKey('SkillCluster', on_delete=models.SET_NULL, blank=True, null=True)
 
 
-class ImageCollection(StringEmbedding):
-    name = models.CharField(max_length=50, editable=False)
-    url = models.URLField(max_length=800, unique=True)
-    collection_id = models.CharField(max_length=50, editable=False) # id specific to the provider
+
+# todo here is make a script or a method to get all the image collections and assosiate them with skills or images or something
+class Image(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    url = models.URLField(max_length=800, unique=True, editable=False)
+    domain = models.CharField(max_length=30, editable=False)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    url_alive = models.BooleanField(default=True)
 
     class providers(models.TextChoices):
         UNSPLASH = 'unsplash', 'Unsplash'
         PEXELS = 'pexels', 'Pexels'
         SHUTTERSTOCK = 'shutterstock', 'Shutterstock'
+        GCC_DATASET = 'gcc_dataset', 'Google Conceptual Captions Dataset'
 
-    provider = models.CharField(
-        max_length=30,
-        choices=providers.choices
-    )
+    provider = models.CharField(max_length=30, choices=providers.choices)
+
+    def __str__(self):
+        # if self.name:
+        #     s = self.name
+        # elif self.description:
+        #     s = self.description
+        # else:
+        #     s = self.url
+        # return str(s)
+        return str(self.url)
 
 
 class Content(models.Model):
@@ -64,7 +79,8 @@ class Content(models.Model):
     title = models.TextField()
     subtitle = models.TextField(blank=True, null=True)
     thumbnail = models.URLField(blank=True, null=True)
-    thumbnail_alternatives = models.JSONField(default=dict)
+    thumbnail_alternative = models.ForeignKey(Image, on_delete=models.SET_NULL, blank=True, null=True)
+    thumbnail_alternative_url = models.URLField(blank=True, null=True)  # this is just to make it easier for the main api, since it only has access to a non-relational mirror of the database
     content = models.TextField()
     # https://pypi.org/project/readtime/
     content_read_seconds = models.IntegerField()  # seconds = num_words / 265 * 60 + img_weight * num_images
