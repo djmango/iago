@@ -45,13 +45,13 @@ class Skill(StringEmbedding):
 # todo here is make a script or a method to get all the image collections and assosiate them with skills or images or something
 class Image(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100)
     url = models.URLField(max_length=800, unique=True, editable=False)
     domain = models.CharField(max_length=30, editable=False)
     description = models.TextField(blank=True, null=True)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+    url_alive = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    url_alive = models.BooleanField(default=True)
 
     class providers(models.TextChoices):
         UNSPLASH = 'unsplash', 'Unsplash'
