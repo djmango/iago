@@ -13,4 +13,5 @@ from iago.settings import DEBUG
 
 # setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'iago.settings')
+os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 django.setup()

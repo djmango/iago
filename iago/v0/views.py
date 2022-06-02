@@ -225,10 +225,20 @@ def updateArticle(article_uuid):
         # we really hate gifs
         if '.gif' in article.thumbnail:
             article.thumbnail = None
+
+        # get us an alternate thumbnail from our images library
+        # if article.thumbnail_alternative is None or article.thumbnail_alternative_url is None or not article.thumbnail_alternative.url_alive:
+        #     img = index.image_index.query(article.embedding_all_mpnet_base_v2, k=1)[0][0]
+        #     article.thumbnail_alternative = img
+        #     article.thumbnail_alternative_url = img.url
+        
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
     except Exception as e:
         logger.error(e)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
+        if 'Post was removed by the user' or 'Account is suspended' in str(e):
+            article.deleted = True
+            article.save()
 
 
 class updateContent(views.APIView):
@@ -255,6 +265,42 @@ class updateContent(views.APIView):
         pool.map_async(updateArticle, articles_uuid)
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
+
+class queryIndex(views.APIView):
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
+
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.queryKIndexSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        k = int(request.data['k'])
+        index_choice = str(request.data['index'])
+
+        if index_choice == 'topic':
+            query_index = index.topic_index
+        elif index_choice == 'skill':
+            query_index = index.skills_index
+        elif index_choice == 'content':
+            query_index = index.content_index
+        elif index_choice == 'image':
+            query_index = index.image_index
+        else:
+            return Response({'status': 'error', 'response': 'invalid index'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results, rankings, query_vector = query_index.query(query, k)
+
+        results_pk = results.values_list('pk', flat=True)
+        results_ranked = []
+        for pk, score in rankings:
+            results_ranked.append(results.filter(pk=pk).values().first())
+
+        return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
 
 
 class searchSkills(views.APIView):

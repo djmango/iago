@@ -10,7 +10,7 @@ from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Skill, Topic
+from v0.models import Content, Skill, Topic, Image
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class VectorIndex():
 
         return cleaned_indices
 
-    def query(self, query: str, k: int = 1, min_distance: float = 0.0):
+    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0):
         """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
@@ -128,7 +128,9 @@ class VectorIndex():
 topic_index: VectorIndex
 skills_index: VectorIndex
 content_index: VectorIndex
+image_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+image_index = VectorIndex(Image.objects.filter(provider__in=['shutterstock', 'gettyimages', 'istockphoto'])) # only allowing sources i've verified as stock images

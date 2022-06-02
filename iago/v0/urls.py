@@ -7,6 +7,7 @@ from v0 import views
 logger = logging.getLogger(__name__)
 
 urlpatterns = [
+    path('index/query', views.queryIndex.as_view()),
     path('content/update', views.updateContent.as_view()),
     path('content/search', views.searchContent.as_view()),
     path('content/recommend', views.recomendContent.as_view()),

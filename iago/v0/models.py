@@ -46,20 +46,20 @@ class Skill(StringEmbedding):
 class Image(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     url = models.URLField(max_length=800, unique=True, editable=False)
-    domain = models.CharField(max_length=30, editable=False)
+    provider = models.CharField(max_length=30, editable=False)
     description = models.TextField(blank=True, null=True)
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
     url_alive = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class providers(models.TextChoices):
+    class sources(models.TextChoices):
         UNSPLASH = 'unsplash', 'Unsplash'
         PEXELS = 'pexels', 'Pexels'
         SHUTTERSTOCK = 'shutterstock', 'Shutterstock'
         GCC_DATASET = 'gcc_dataset', 'Google Conceptual Captions Dataset'
 
-    provider = models.CharField(max_length=30, choices=providers.choices)
+    source = models.CharField(max_length=30, choices=sources.choices)
 
     def __str__(self):
         # if self.name:

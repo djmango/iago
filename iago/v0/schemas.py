@@ -32,6 +32,18 @@ jobSkillMatchSchema = {
     "required": ["jobtitle"],
 }
 
+kSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "k": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+        }
+    },
+    "required": ["k"],
+}
+
 queryKSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -47,17 +59,23 @@ queryKSchema = {
     "required": ["query"],
 }
 
-
-kSchema = {
+queryKIndexSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
+        "query": {
+            "type": "string",
+        },
+        "index": {
+            "type": "string",
+            "enum": ["topic", "skill", "content", "image"]
+        },
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
         }
     },
-    "required": ["k"],
+    "required": ["query", "index"],
 }
 
 textsSchema = {
