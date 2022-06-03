@@ -176,6 +176,8 @@ def updateArticle(article_uuid):
     postID = article.url.split('/')[-1].split('-')[-1]
     try:
         r = requests.get(f'https://medium.com/_/api/posts/{postID}')
+        if not r.status_code == 200:
+            raise Exception(f'failed to get article {postID}, status code {r.status_code}')
         data = json.loads(r.text[16:])
 
         # if user deleted the article or their account then we mark it as deleted
@@ -237,7 +239,7 @@ def updateArticle(article_uuid):
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
     except Exception as e:
-        logger.error(e)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
+        logger.error(str(e))  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
         if 'Post was removed by the user' or 'Account is suspended' in str(e):
             article.deleted = True
             logger.error(f'Logging {article.title} as deleted')
