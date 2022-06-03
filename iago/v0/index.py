@@ -133,4 +133,4 @@ if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     skills_index = VectorIndex(Skill.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
-image_index = VectorIndex(Image.objects.filter(provider__in=['shutterstock', 'gettyimages', 'istockphoto'])) # only allowing sources i've verified as stock images
+    image_index = VectorIndex(Image.objects.filter(provider__in=['shutterstock', 'gettyimages', 'istockphoto'])) # only allowing sources i've verified as stock images

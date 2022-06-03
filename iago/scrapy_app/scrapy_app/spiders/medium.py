@@ -115,7 +115,10 @@ class MediumSpider(scrapy.spiders.CrawlSpider):
             article.author = article.url.split('@')[1].split('/')[0]
 
         article.subtitle = post['virtuals']['subtitle']
-        article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
+        if 'previewImage' in post['virtuals']:
+            article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
+        else:
+            article.thumbnail = None
         article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60)
         article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
         article.provider = 'medium'

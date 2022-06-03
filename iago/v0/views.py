@@ -186,6 +186,8 @@ def updateArticle(article_uuid):
                 article.updated_on = Now()
                 article.save()
             return
+        else:
+            article.deleted = False
 
         post = data['payload']['value']
 
@@ -222,8 +224,8 @@ def updateArticle(article_uuid):
                 if t['slug'] not in article.tags:
                     article.tags.append(t['slug'])
 
-        # we really hate gifs
-        if '.gif' in article.thumbnail:
+        # we really hate gifs - also null out the default image, no point of keeping it
+        if '.gif' in article.thumbnail or article.thumbnail == 'https://miro.medium.com/':
             article.thumbnail = None
 
         # get us an alternate thumbnail from our images library
@@ -238,6 +240,7 @@ def updateArticle(article_uuid):
         logger.error(e)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
         if 'Post was removed by the user' or 'Account is suspended' in str(e):
             article.deleted = True
+            logger.error(f'Logging {article.title} as deleted')
             article.save()
 
 
