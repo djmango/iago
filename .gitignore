@@ -163,3 +163,4 @@ job-skill-match/embedding/jobs/csv/
 .serverless
 .vscode/bookmarks.json
 iago/scripts/data/
+.envrc

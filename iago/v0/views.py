@@ -177,7 +177,8 @@ def updateArticle(article_uuid):
     try:
         r = requests.get(f'https://medium.com/_/api/posts/{postID}')
         if not r.status_code == 200:
-            raise Exception(f'failed to get article {postID}, status code {r.status_code}')
+            raise Exception(f'Failed to get article {article.title}, status code {r.status_code}')
+            # cause slowdown on 429
         data = json.loads(r.text[16:])
 
         # if user deleted the article or their account then we mark it as deleted
