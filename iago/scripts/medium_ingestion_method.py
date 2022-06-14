@@ -1,6 +1,5 @@
 # import header
 
-from curses import meta
 import requests
 import re
 import json
@@ -19,9 +18,8 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-response = requests.get(url, headers=headers, data=payload, verify=False)
-article_data = response.json()
-paragraphs = article_data['value']['content']['bodyModel']['paragraphs']
+response = requests.post(url, headers=headers, data=payload)
+paragraphs = response.json()['payload']['value']['content']['bodyModel']['paragraphs']
 output = ""
 
 def medium_to_markdown(text_block, last_type) -> str:

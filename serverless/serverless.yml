@@ -29,5 +29,5 @@ functions:
     timeout: 6
     events:
       - httpApi:
-          method: get
-          path: /medium/{url}
+          method: post
+          path: /medium

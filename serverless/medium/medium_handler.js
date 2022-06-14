@@ -11,7 +11,7 @@ function getRequest(url) {
 
             res.on('end', () => {
                 try {
-                    resolve(JSON.parse(rawData.slice(16)));
+                    resolve([JSON.parse(rawData.slice(16)), res.headers]);
                 } catch (err) {
                     reject(new Error(err));
                 }
@@ -41,11 +41,16 @@ exports.handler = async function (event, context, callback) {
         let id = url.split('/').pop().split('-').pop();
         let apiUrl = `https://medium.com/_/api/posts/${id}?format=json`;
         console.log(apiUrl);
-        let result = await getRequest(apiUrl);
+        let [result, headers] = await getRequest(apiUrl);
+        console.log('headers: ', headers);
         console.log('result is: ', result.payload);
 
         // response structure assume you use proxy integration with API gateway
-        return JSON.stringify(result.payload);
+        return_object = {
+            'headers': headers,
+            'payload': result.payload
+        }
+        return return_object
     } catch (error) {
         console.log('Error is: ', error);
         return error.message
