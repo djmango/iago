@@ -5,12 +5,14 @@ from typing import Iterable
 
 import faiss
 import numpy as np
+from django.core.cache import cache
 from django.db.models.query import QuerySet
 from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Skill, Topic, Image
+from v0.models import Content, Image, Skill, Topic
+from v0.utils import get_hash
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -45,6 +47,10 @@ class VectorIndex():
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
 
+    def _generate_vector_cache_string(self, vector: np.ndarray, k: int):
+        """ Generate a unique string to given a vector and k """
+        hashed_vector = get_hash(vector.tolist())
+        return f'{hashed_vector.hex()}_k{k}'
 
     def _min_distance(self, indices: list[int], min_distance: float):
         """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
@@ -80,13 +86,14 @@ class VectorIndex():
 
         return cleaned_indices
 
-    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0):
+    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True):
         """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
             query (str, list, np.ndarray): The string or embedding vector to find closest matches for
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
+            use_cached (bool, optional): Whether to use the cached vectors or not. Defaults to True.
 
         Returns:
             results: (QuerySet): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
@@ -112,8 +119,19 @@ class VectorIndex():
         else:
             p = 1
 
-        values, indices = self.index.search(query_vector, k*p)
-        self.logger.info(f'Searched index and got {len(values[0])} vectors in {round(time.perf_counter()-start, 4)}s')
+        # generate a unique deterministic string to cache the results
+        vector_cache_string = self._generate_vector_cache_string(query_vector, k*p)
+        self.logger.info(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
+        cached_results = cache.get(vector_cache_string)
+
+        if cached_results and use_cached:  # if we got results just depickle them
+            values, indices = cached_results
+            self.logger.info(f'Got cache for {vector_cache_string} in {time.perf_counter()-start:.3f}s')
+        else:  # if not in cache, run the search and cache the results
+            values, indices = self.index.search(query_vector, k*p)
+            # store the results as a tuple of np.ndarrays to be able to depickle easily later
+            cache.set(vector_cache_string, (values, indices), timeout=60*60*24*7)  # 7 day timeout
+            self.logger.info(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:
@@ -131,6 +149,6 @@ content_index: VectorIndex
 image_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    skills_index = VectorIndex(Skill.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     image_index = VectorIndex(Image.objects.filter(provider__in=['shutterstock', 'gettyimages', 'istockphoto'])) # only allowing sources i've verified as stock images
+skills_index = VectorIndex(Skill.objects.all())

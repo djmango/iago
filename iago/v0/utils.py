@@ -1,7 +1,11 @@
+import dataclasses
+import datetime
+import hashlib
 import json
 import logging
 import time
 import unicodedata
+from collections.abc import Collection
 
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.cache import cache
@@ -52,13 +56,13 @@ def is_valid_json(s: str):
         return False
 
 # TODO: make an option for caching n results instead of just top
-def search_fuzzy_cache(model: models.Model, name: str, no_cache=False):
+def search_fuzzy_cache(model: models.Model, name: str, use_cached=True):
     """ Gets closest queryset object to the given name
 
     Args:
         model (django.db.models.Model): Model type to search
         name (str): Name to find closest match to
-        no_cache (bool, optional): Disallow pulling a search result from cache, defaults to False
+        use_cashed (bool, optional): Allow pulling a search result from cache, defaults to True
 
     Returns:
         model instance: Closest matched instance, from cache if available
@@ -68,9 +72,9 @@ def search_fuzzy_cache(model: models.Model, name: str, no_cache=False):
     start = time.perf_counter()
     name_cachesafe = f"{str(model._meta).lower()}_trigram_{name.lower().replace(' ', '_')}"
     cached_object = cache.get(name_cachesafe)
-    if cached_object and not no_cache:  # if so do a simple pk lookup
+    if cached_object and use_cached:  # if so do a simple pk lookup
         object = model.objects.get(name=cached_object)
-        logger.debug(f'Get cache for {name} took {time.perf_counter()-start:.3f}s')
+        logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
     else:  # if not in cache, find the closest match using trigram and store the result in cache
         object = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gt=0.7).order_by('-similarity').first()
         if object is not None:
@@ -78,3 +82,87 @@ def search_fuzzy_cache(model: models.Model, name: str, no_cache=False):
         logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
 
     return object
+
+#  -- Deterministic Hashing --
+
+"""
+https://death.andgravity.com/stable-hashing
+Generate stable hashes for Python data objects.
+Contains no business logic.
+The hashes should be stable across interpreter implementations and versions.
+Supports dataclass instances, datetimes, and JSON-serializable objects.
+Empty dataclass fields are ignored, to allow adding new fields without
+the hash changing. Empty means one of: None, '', (), [], or {}.
+The dataclass type is ignored: two instances of different types
+will have the same hash if they have the same attribute/value pairs.
+https://github.com/lemon24/reader/blob/1efcd38c78f70dcc4e0d279e0fa2a0276749111e/src/reader/_hash_utils.py
+"""
+
+# The first byte of the hash contains its version,
+# to allow upgrading the implementation without changing existing hashes.
+# (In practice, it's likely we'll just let the hash change and update
+# the affected objects again; nevertheless, it's good to have the option.)
+#
+# A previous version recommended using a check_hash(thing, hash) -> bool
+# function instead of direct equality checking; it was removed because
+# it did not allow objects to cache the hash.
+
+_VERSION = 0
+_EXCLUDE = '_hash_exclude_'
+
+
+def get_hash(thing: object) -> bytes:
+    prefix = _VERSION.to_bytes(1, 'big')
+    digest = hashlib.md5(_json_dumps(thing).encode('utf-8')).digest()
+    return prefix + digest[:-1]
+
+
+def _json_dumps(thing: object) -> str:
+    return json.dumps(
+        thing,
+        default=_json_default,
+        # force formatting-related options to known values
+        ensure_ascii=False,
+        sort_keys=True,
+        indent=None,
+        separators=(',', ':'),
+    )
+
+
+def _json_default(thing: object) -> any:
+    try:
+        return _dataclass_dict(thing)
+    except TypeError:
+        pass
+    if isinstance(thing, datetime.datetime):
+        return thing.isoformat(timespec='microseconds')
+    raise TypeError(f"Object of type {type(thing).__name__} is not JSON serializable")
+
+
+def _dataclass_dict(thing: object) -> dict[str, any]:
+    # we could have used dataclasses.asdict()
+    # with a dict_factory that drops empty values,
+    # but asdict() is recursive and we need to intercept and check
+    # the _hash_exclude_ of nested dataclasses;
+    # this way, json.dumps() does the recursion instead of asdict()
+
+    # raises TypeError for non-dataclasses
+    fields = dataclasses.fields(thing)
+    # ... but doesn't for dataclass *types*
+    if isinstance(thing, type):
+        raise TypeError("got type, expected instance")
+
+    exclude = getattr(thing, _EXCLUDE, ())
+
+    rv = {}
+    for field in fields:
+        if field.name in exclude:
+            continue
+
+        value = getattr(thing, field.name)
+        if value is None or not value and isinstance(value, Collection):
+            continue
+
+        rv[field.name] = value
+
+    return rv
