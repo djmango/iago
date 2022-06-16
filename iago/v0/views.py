@@ -125,20 +125,19 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])
-        skills = [x[0] for x in skills] # skills is a list of results lists, but we only ask for 1 result per
+        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])] # skills is a list of results lists, but we only ask for 1 result per
         pool.close()
 
-        skills_result = []
+        adjacent_skills = []
         for skill, skill_name in zip(skills, request.data['skills']):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
                 skills_ranked = list(zip(*rankings))[0]
 
-                skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
+                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
 
-        return Response({'skills': skills_result}, status=status.HTTP_200_OK)
+        return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
 
 def updateArticle(article_uuid):
     """ seperate function for job pooling """
@@ -311,6 +310,77 @@ class modelAutocomplete(views.APIView):
         results_pk = results.values_list('pk', flat=True)
 
         return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
+
+
+class adjacentSkillContent(views.APIView):
+    """ search for content based on skills """
+    permission_classes = [HasGroupPermission]
+    allowed_groups = {
+        'GET': ['express_api']
+    }
+
+    @silk_profile(name='Adjacent skill content')
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        # required
+        query_skills = request.data['skills'] if 'skills' in request.data else None
+        content_type = request.data['type']
+        k: int = request.data['k']
+        # optional
+        length = request.data['length'] if 'length' in request.data else None
+        page: int = request.data['page'] if 'page' in request.data else 0
+
+        start = time.perf_counter()
+
+        # pool = ThreadPool(processes=MAX_DB_THREADS)
+        # skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills])]
+        # pool.close()
+        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+        logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
+        skills = [x for x in skills if x is not None]  # remove none values
+
+        # okay now we need to get adjacent skills
+        adjacent_skills = []
+        for skill, skill_name in zip(skills, request.data['skills']):
+            if skill is not None:
+                # get adjacent skills for our skill
+                results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=5)
+                skills_ranked = list(zip(*rankings))[0]
+
+                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
+                skills.append(skill)
+
+        # skills tag search
+        content_to_return = Content.objects.filter(skills__in=skills)
+
+        # apply filters to content_to_return queryset
+        # type filter
+        content_to_return = content_to_return.filter(type__in=content_type)
+
+        # length filter
+        if length:
+            content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
+
+        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
+        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
+
+        # unique filter
+        content_to_return = content_to_return.distinct('uuid')
+
+        # perform the transaction
+        content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'thumbnail_alternative', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
+
+        logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
+
+        if len(content_to_return) == 0:
+            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills]}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills], 'adjacent_skills': [x['name'] for x in adjacent_skills]}, status=status.HTTP_200_OK)
+
 
 class searchContent(views.APIView):
     """ search for content based on skills """

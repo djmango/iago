@@ -31,6 +31,7 @@ LOGIN_URL = '/admin/login/'
 
 # silk profiling
 SILKY_PYTHON_PROFILER = True
+SILKY_PYTHON_PROFILER_BINARY = True
 SILKY_AUTHENTICATION = True  # User must login
 SILKY_AUTHORISATION = True  # User must have permissions
 SILKY_MAX_REQUEST_BODY_SIZE = -1  # Silk takes anything <0 as no limit

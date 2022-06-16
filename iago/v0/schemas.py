@@ -193,6 +193,51 @@ searchContentSchema = {
 }
 
 
+adjacentSkillContentSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "skills": {
+            "type": "array",
+            "description": "The skills to look for in content.",
+            "items": {
+                "type": "string"
+            }
+        },
+        "type": {
+            "type": "array",
+            "description": "The types of content to allow in result.",
+            "items": {
+                "type": "string",
+                "enum": vars(Content.types)["_member_names_"],
+            }
+        },
+        "length": {
+            "type": "array",
+            "description": "Min and a max read length in seconds filter.",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": True,
+            "items": {
+                "type": "integer",
+                "inclusiveMinimum": 0
+            }
+        },
+        "k": {
+            "type": "integer",
+            "description": "The number of content pieces to return.",
+            "exclusiveMinimum": 0
+        },
+        "page": {
+            "type": "integer",
+            "description": "The page to return. Each page has k elements. Defaults to 0.",
+            "inclusiveMinimum": 0
+        }
+    },
+    "required": ["skills", "type", "k"]
+}
+
+
 adjacentSkillsSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
