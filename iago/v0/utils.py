@@ -158,14 +158,12 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
     # check if available in cache first
     start = time.perf_counter()
     cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
-    cached_results = cache.get(cache_key)
-    if cached_results and use_cached:  # if so do a simple pk lookup
-        results = model.objects.filter(pk__in=cached_results) # cached_results is a list of pks
+    results = cache.get(cache_key)
+    if results and use_cached:  # if so do a simple pk lookup
         logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
     else:  # if not in cache, find the closest match using trigram and store the result in cache
         results = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k]
-        if object is not None:
-            cache.set(cache_key, [r.pk for r in results], timeout=60*60*24*7)  # 7 day timeout
+        cache.set(cache_key, results, timeout=60*60*24*2)  # 2 day timeout
         logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
 
     return results
