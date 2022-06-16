@@ -55,34 +55,6 @@ def is_valid_json(s: str):
     except ValueError:
         return False
 
-# TODO: make an option for caching n results instead of just top
-def search_fuzzy_cache(model: models.Model, name: str, use_cached=True):
-    """ Gets closest queryset object to the given name
-
-    Args:
-        model (django.db.models.Model): Model type to search
-        name (str): Name to find closest match to
-        use_cashed (bool, optional): Allow pulling a search result from cache, defaults to True
-
-    Returns:
-        model instance: Closest matched instance, from cache if available
-    """
-
-    # check if available in cache first
-    start = time.perf_counter()
-    name_cachesafe = f"{str(model._meta).lower()}_trigram_{name.lower().replace(' ', '_')}"
-    cached_object = cache.get(name_cachesafe)
-    if cached_object and use_cached:  # if so do a simple pk lookup
-        object = model.objects.get(name=cached_object)
-        logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
-    else:  # if not in cache, find the closest match using trigram and store the result in cache
-        object = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gt=0.7).order_by('-similarity').first()
-        if object is not None:
-            cache.set(name_cachesafe, object.name, timeout=60*60*24*7)  # 7 day timeout
-        logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
-
-    return object
-
 #  -- Deterministic Hashing --
 
 """
@@ -166,3 +138,34 @@ def _dataclass_dict(thing: object) -> dict[str, any]:
         rv[field.name] = value
 
     return rv
+
+
+# TODO: make an option for caching n results instead of just top
+def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True):
+    """ Gets closest queryset object to the given name
+
+    Args:
+        model (django.db.models.Model): Model type to search
+        name (str): Name to find closest match to
+        k (int): Max number of results to return
+        similarity_minimum (float): Minimum similarity (max 1)
+        use_cashed (bool, optional): Allow pulling a search result from cache, defaults to True
+
+    Returns:
+        QuerySet: K Closest matched instances, from cache if available
+    """
+
+    # check if available in cache first
+    start = time.perf_counter()
+    cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
+    cached_results = cache.get(cache_key)
+    if cached_results and use_cached:  # if so do a simple pk lookup
+        results = model.objects.filter(pk__in=cached_results) # cached_results is a list of pks
+        logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
+    else:  # if not in cache, find the closest match using trigram and store the result in cache
+        results = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k]
+        if object is not None:
+            cache.set(cache_key, [r.pk for r in results], timeout=60*60*24*7)  # 7 day timeout
+        logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
+
+    return results

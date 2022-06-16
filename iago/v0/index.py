@@ -11,7 +11,7 @@ from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Image, Skill, Topic
+from v0.models import Content, Skill, Topic
 from v0.utils import get_hash
 
 HERE = Path(__file__).parent
@@ -47,10 +47,10 @@ class VectorIndex():
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
 
-    def _generate_vector_cache_string(self, vector: np.ndarray, k: int):
+    def _generate_cache_key(self, vector: np.ndarray, k: int):
         """ Generate a unique string to given a vector and k """
         hashed_vector = get_hash(vector.tolist())
-        return f'{hashed_vector.hex()}_k{k}'
+        return f'queryvector_{hashed_vector.hex()}_k{k}'
 
     def _min_distance(self, indices: list[int], min_distance: float):
         """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
@@ -120,17 +120,17 @@ class VectorIndex():
             p = 1
 
         # generate a unique deterministic string to cache the results
-        vector_cache_string = self._generate_vector_cache_string(query_vector, k*p)
+        cache_key = self._generate_cache_key(query_vector, k*p)
         self.logger.info(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
-        cached_results = cache.get(vector_cache_string)
+        cached_results = cache.get(cache_key)
 
         if cached_results and use_cached:  # if we got results just depickle them
             values, indices = cached_results
-            self.logger.info(f'Got cache for {vector_cache_string} in {time.perf_counter()-start:.3f}s')
+            self.logger.info(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
             # store the results as a tuple of np.ndarrays to be able to depickle easily later
-            cache.set(vector_cache_string, (values, indices), timeout=60*60*24*7)  # 7 day timeout
+            cache.set(cache_key, (values, indices), timeout=60*60*24*7)  # 7 day timeout
             self.logger.info(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
@@ -150,5 +150,4 @@ image_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
-    image_index = VectorIndex(Image.objects.filter(provider__in=['shutterstock', 'gettyimages', 'istockphoto'])) # only allowing sources i've verified as stock images
-skills_index = VectorIndex(Skill.objects.all())
+    skills_index = VectorIndex(Skill.objects.all())

@@ -124,6 +124,7 @@ class adjacentSkills(views.APIView):
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
         skills = pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])
+        skills = [x[0] for x in skills] # skills is a list of results lists, but we only ask for 1 result per
         pool.close()
 
         skills_result = []
@@ -136,36 +137,6 @@ class adjacentSkills(views.APIView):
                 skills_result.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
 
         return Response({'skills': skills_result}, status=status.HTTP_200_OK)
-
-
-def transformArticles(articles):
-    """ transform articles into vectors and save to db """
-    # get their contents and embed them
-    logger.info(f'generating vectors for {len(articles)}')
-    contents = [x.content for x in articles]
-    vectors = ai.embedding_model.model.encode(contents, show_progress_bar=True)
-
-    # update the queryset articles with the new embeddings
-    logger.info('saving vectors..')
-    for article, vector in zip(articles, vectors):
-        article.embedding_all_mpnet_base_v2 = vector.tolist()
-        article.save()
-
-
-class transformContents(views.APIView):
-    """ transform all scraped articles and saves the embeddings """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {}
-
-    def get(self, request):
-        # get all articles with no embeddings
-        start = time.perf_counter()
-        articles: list[Content] = list(Content.objects.filter(embedding_all_mpnet_base_v2__isnull=True))
-
-        # start transforming in a thread
-        threading.Thread(target=transformArticles, name=f'transformArticles_{len(articles)}', args=[articles]).start()
-        return Response({'status': 'started', 'count': len(articles), 'time': round(time.perf_counter()-start, 3)}, status=status.HTTP_200_OK)
-
 
 def updateArticle(article_uuid):
     """ seperate function for job pooling """
@@ -272,6 +243,7 @@ class updateContent(views.APIView):
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
+# TODO: create cache for embeddings or maybe a database call since they are deterministic
 class queryIndex(views.APIView):
     permission_classes = [HasGroupPermission]
     allowed_groups = {
@@ -294,10 +266,8 @@ class queryIndex(views.APIView):
             query_index = index.skills_index
         elif index_choice == 'content':
             query_index = index.content_index
-        elif index_choice == 'image':
-            query_index = index.image_index
         else:
-            return Response({'status': 'error', 'response': 'invalid index'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
         results, rankings, query_vector = query_index.query(query, k)
 
@@ -308,8 +278,7 @@ class queryIndex(views.APIView):
 
         return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
 
-
-class searchSkills(views.APIView):
+class modelAutocomplete(views.APIView):
     permission_classes = [HasGroupPermission]
     allowed_groups = {
         'GET': ['express_api']
@@ -317,16 +286,28 @@ class searchSkills(views.APIView):
 
     def get(self, request):
         try:
-            jsonschema.validate(request.data, schema=schemas.queryKSchema)
+            jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         query = str(request.data['query'])
+        model_choice = str(request.data['model'])
         k = int(request.data['k'])
+        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
 
-        skills = Skill.objects.annotate(similarity=TrigramSimilarity('name', query)).filter(similarity__gt=0.3).order_by('-similarity')
-        return Response({'skills': [str(x.name) for x in skills][:k]}, status=status.HTTP_200_OK)
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'content':
+            model = Content
+        else:
+            return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        results = search_fuzzy_cache(model, query, k, similarity_minimum)
+        results_pk = results.values_list('pk', flat=True)
+
+        return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
 
 class searchContent(views.APIView):
     """ search for content based on skills """
@@ -365,7 +346,7 @@ class searchContent(views.APIView):
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
             pool = ThreadPool(processes=MAX_DB_THREADS)
-            skills.extend(pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]))
+            skills.extend([x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills])])
             pool.close()
             logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
             skills = [x for x in skills if x is not None]  # remove none values
@@ -426,7 +407,7 @@ class recomendContent(views.APIView):
 
         start = time.perf_counter()
         # first match the free-form job title provided to one embedded in our database
-        job: Job = search_fuzzy_cache(Job, request.data['position'])
+        job: Job = search_fuzzy_cache(Job, request.data['position'])[0]
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []
@@ -496,7 +477,7 @@ class jobSkillMatch(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         start = time.perf_counter()
-        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])
+        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0]
         logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
 
         if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones

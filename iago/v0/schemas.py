@@ -68,7 +68,7 @@ queryKIndexSchema = {
         },
         "index": {
             "type": "string",
-            "enum": ["topic", "skill", "content", "image"]
+            "enum": ["topic", "skill", "content"]
         },
         "k": {
             "type": "integer",
@@ -90,6 +90,34 @@ textsSchema = {
         }
     },
     "required": ["texts"],
+}
+
+autocompleteSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "The string to autocomplete"
+        },
+        "model": {
+            "type": "string",
+            "description": "The model type to autocomplete",
+            "enum": ["topic", "skill", "content"]
+        },
+        "k": {
+            "type": "integer",
+            "description": "The number of results to return",
+            "exclusiveMinimum": 0
+        },
+        "similarity_minimum": {
+            "type": "integer",
+            "description": "The minimum similarity between the query and the results",
+            "exclusiveMinimum": 0,
+            "inclusiveMaximum": 100
+        },
+    },
+    "required": ["query", "model", "k"],
 }
 
 
