@@ -113,7 +113,7 @@ class adjacentSkills(views.APIView):
         'GET': ['scrapy_spider']
     }
 
-    @silk_profile(name='Adjacent Skills')
+    @silk_profile(name='Adjacent skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
@@ -286,6 +286,7 @@ class modelAutocomplete(views.APIView):
         'GET': ['express_api']
     }
 
+    @silk_profile(name='Model autocomplete')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
@@ -318,6 +319,7 @@ class searchContent(views.APIView):
         'GET': ['express_api']
     }
 
+    @silk_profile(name='Search content')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.searchContentSchema)

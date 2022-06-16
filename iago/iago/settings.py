@@ -27,6 +27,8 @@ SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 LOGGING_LEVEL_MODULE = logging.DEBUG
 MAX_DB_THREADS = 16
 
+LOGIN_URL = '/admin/login/'
+
 # silk profiling
 SILKY_PYTHON_PROFILER = True
 SILKY_AUTHENTICATION = True  # User must login
