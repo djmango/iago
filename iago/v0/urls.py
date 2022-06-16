@@ -13,7 +13,6 @@ urlpatterns = [
     path('content/search', views.searchContent.as_view()),
     path('content/recommend', views.recomendContent.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
-    path('skillspace/search', views.searchSkills.as_view()),
     path('skillspace/adjacent', views.adjacentSkills.as_view()),
     path('skillspace/match', views.matchSkills.as_view()),
     path('skillspace/match_embeds', views.matchSkillsEmbeds.as_view()),
