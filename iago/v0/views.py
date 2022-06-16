@@ -15,6 +15,7 @@ from iago.permissions import HasGroupPermission
 from iago.settings import DEBUG, LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 from rest_framework import status, views
 from rest_framework.response import Response
+from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.models import Content, Job, Skill, Topic
@@ -112,6 +113,7 @@ class adjacentSkills(views.APIView):
         'GET': ['scrapy_spider']
     }
 
+    @silk_profile(name='Adjacent Skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)

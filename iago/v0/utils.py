@@ -10,6 +10,7 @@ from collections.abc import Collection
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.cache import cache
 from django.db import models
+from django.db.models.query import QuerySet
 from iago.settings import LOGGING_LEVEL_MODULE
 
 logger = logging.getLogger(__name__)
@@ -159,7 +160,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
     start = time.perf_counter()
     cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
     results = cache.get(cache_key)
-    if results and use_cached:  # if so do a simple pk lookup
+    if use_cached and results and type(results) == QuerySet:  # if so do a simple pk lookup
         logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
     else:  # if not in cache, find the closest match using trigram and store the result in cache
         results = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k]

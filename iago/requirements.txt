@@ -13,5 +13,6 @@ faiss-cpu~=1.7.2
 transformers~=4.19.2
 sentence-transformers~=2.1.0
 django-extensions
+djnago-silk
 tldextract~=3.3.0
 # newrelic==7.10.0.175

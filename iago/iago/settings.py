@@ -27,6 +27,15 @@ SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 LOGGING_LEVEL_MODULE = logging.DEBUG
 MAX_DB_THREADS = 16
 
+# silk profiling
+SILKY_PYTHON_PROFILER = True
+SILKY_AUTHENTICATION = True  # User must login
+SILKY_AUTHORISATION = True  # User must have permissions
+SILKY_MAX_REQUEST_BODY_SIZE = -1  # Silk takes anything <0 as no limit
+SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # If response body>1024 bytes, ignore
+SILKY_META = True
+# SILKY_INTERCEPT_PERCENT = 50 # log only 50% of requests
+
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
     print('DJANGO SETTINGS IN DEBUG')
@@ -53,6 +62,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
+    'silk'
     # 'drf_yasg',
 ]
 
@@ -61,6 +71,7 @@ if DEBUG:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'silk.middleware.SilkyMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
