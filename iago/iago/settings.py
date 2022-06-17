@@ -65,7 +65,8 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
-    'silk'
+    'silk',
+    'rest_framework_simplejwt'
     # 'drf_yasg',
 ]
 
@@ -119,6 +120,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ]
 }
 
