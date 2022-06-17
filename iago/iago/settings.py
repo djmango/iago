@@ -67,8 +67,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
-    'silk',
-    'rest_framework_simplejwt'
+    'silk'
     # 'drf_yasg',
 ]
 
@@ -121,8 +120,7 @@ WSGI_APPLICATION = 'iago.wsgi.application'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
     ]
 }
 

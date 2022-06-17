@@ -15,4 +15,3 @@ sentence-transformers~=2.1.0
 tldextract~=3.3.0
 django-extensions
 django-silk
-djangorestframework-simplejwt
