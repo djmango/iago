@@ -8,7 +8,6 @@ from multiprocessing.pool import ThreadPool
 import jsonschema
 import numpy as np
 import requests
-from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models import Q
 from django.db.models.functions import Now
 from iago.permissions import HasGroupPermission

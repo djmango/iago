@@ -164,3 +164,4 @@ job-skill-match/embedding/jobs/csv/
 .vscode/bookmarks.json
 iago/scripts/data/
 .envrc
+.tmp/
