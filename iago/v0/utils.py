@@ -163,7 +163,12 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
     if use_cached and results and type(results) == QuerySet:  # if so do a simple pk lookup
         logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
     else:  # if not in cache, find the closest match using trigram and store the result in cache
-        results = model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k]
+        # So essentially, querysets are lazy loading
+        # so we have to force the execution now
+        # and then cache a queryset thats just filtering for the resulting pks
+        # otherwise we cache a trigram similarity query which is much slower to execute
+        results_pk = list(model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
+        results = model.objects.filter(pk__in=results_pk)
         cache.set(cache_key, results, timeout=60*60*24*2)  # 2 day timeout
         logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
 

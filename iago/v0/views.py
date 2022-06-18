@@ -280,7 +280,9 @@ class modelAutocomplete(views.APIView):
             return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
         results = search_fuzzy_cache(model, query, k, similarity_minimum)
-        results_pk = results.values_list('pk', flat=True)
+        start = time.perf_counter()
+        results_pk = list(results.values_list('pk', flat=True))
+        logger.info(f'Evaluating results queryset k{len(results_pk)} took {time.perf_counter()-start:.3f}s')
 
         return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
 
