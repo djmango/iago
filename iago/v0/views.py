@@ -10,7 +10,6 @@ import numpy as np
 import requests
 from django.db.models import Q
 from django.db.models.functions import Now
-from iago.permissions import HasGroupPermission
 from iago.settings import DEBUG, LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 from rest_framework import status, views
 from rest_framework.response import Response
@@ -27,7 +26,6 @@ logger.setLevel(LOGGING_LEVEL_MODULE)
 
 class transform(views.APIView):
     """ transform texts """
-    permission_classes = [HasGroupPermission]
     allowed_groups = {}
 
     def get(self, request):
@@ -44,10 +42,6 @@ class transform(views.APIView):
 
 class matchSkills(views.APIView):
     """ take texts and return their embedding and related skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['scrapy_spider']
-    }
 
     def get(self, request):
         try:
@@ -79,10 +73,6 @@ class matchSkills(views.APIView):
 
 class matchSkillsEmbeds(views.APIView):
     """ take embeds return their related skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['scrapy_spider']
-    }
 
     def get(self, request):
         try:
@@ -107,10 +97,6 @@ class matchSkillsEmbeds(views.APIView):
 
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['scrapy_spider']
-    }
 
     @silk_profile(name='Adjacent skills')
     def get(self, request):
@@ -220,10 +206,6 @@ def updateArticle(article_uuid):
 
 class updateContent(views.APIView):
     """ update scraped articles with their medium data """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     def get(self, request):
         try:
@@ -245,10 +227,6 @@ class updateContent(views.APIView):
 
 # TODO: create cache for embeddings or maybe a database call since they are deterministic
 class queryIndex(views.APIView):
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     def get(self, request):
         try:
@@ -279,10 +257,6 @@ class queryIndex(views.APIView):
         return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
 
 class modelAutocomplete(views.APIView):
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     @silk_profile(name='Model autocomplete')
     def get(self, request):
@@ -313,10 +287,6 @@ class modelAutocomplete(views.APIView):
 
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     @silk_profile(name='Adjacent skill content')
     def get(self, request):
@@ -383,10 +353,6 @@ class adjacentSkillContent(views.APIView):
 
 class searchContent(views.APIView):
     """ search for content based on skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     @silk_profile(name='Search content')
     def get(self, request):
@@ -467,10 +433,6 @@ class searchContent(views.APIView):
 
 class recomendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     def get(self, request):
         try:
@@ -538,10 +500,6 @@ class recomendContent(views.APIView):
 
 class jobSkillMatch(views.APIView):
     """ take a job title string and return matching skills """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'POST': ['express_api']
-    }
 
     def post(self, request):
         try:
@@ -576,10 +534,6 @@ class topicList(views.APIView):
 
 class topic(views.APIView):
     """ CRUD for specified topic """
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['express_api']
-    }
 
     def get(self, request, name: str):
         name = name.lower()
@@ -610,10 +564,5 @@ class topic(views.APIView):
 
 
 class alive(views.APIView):
-    permission_classes = [HasGroupPermission]
-    allowed_groups = {
-        'GET': ['__all__']
-    }
-
     def get(self, request):
         return Response('alive', status=status.HTTP_200_OK)

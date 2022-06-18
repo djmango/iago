@@ -118,10 +118,12 @@ WSGI_APPLICATION = 'iago.wsgi.application'
 # auth
 # https://www.django-rest-framework.org/api-guide/authentication/
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication'
-    ]
+    # 'DEFAULT_AUTHENTICATION_CLASSES': [
+    #     'rest_framework.authentication.BasicAuthentication',
+    #     'rest_framework.authentication.SessionAuthentication',
+    # ]
+    # auth is now handled by API gateway
+    'DEFAULT_AUTHENTICATION_CLASSES': []
 }
 
 # extensions
