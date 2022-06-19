@@ -1,10 +1,9 @@
 import logging
 import uuid
 
+import numpy as np
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-
-from v0.ai import embedding_model
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +15,10 @@ class StringEmbedding(models.Model):
     name = models.CharField(max_length=255, primary_key=True, editable=False)
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
 
-    def create(self, name: str):
+    def create(self, name: str, embedding: list | np.ndarray | None = None):
         """ Set name and generate embedding """
         self.name = name.lower()
-        self.embedding_all_mpnet_base_v2 = list(embedding_model.model.encode(name))
+        self.embedding_all_mpnet_base_v2 = list(embedding)
         return self
 
     def __str__(self):
@@ -29,8 +28,10 @@ class StringEmbedding(models.Model):
         abstract = True
 
 
-class GenericStringEmbedding(models.Model):
+class GenericStringEmbedding(StringEmbedding):
     """ Uncategorized generic string and embedding pair - used primarily as a persistent cache of embeddings """
+    id = models.BigAutoField(primary_key=True)
+    name = models.TextField(editable=False)
     pass
 
 

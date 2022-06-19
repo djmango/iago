@@ -10,7 +10,7 @@ import numpy as np
 import requests
 from django.db.models import Q
 from django.db.models.functions import Now
-from iago.settings import DEBUG, LOGGING_LEVEL_MODULE, MAX_DB_THREADS
+from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS, SILKY_DEBUG_STR
 from rest_framework import status, views
 from rest_framework.response import Response
 from silk.profiling.profiler import silk_profile
@@ -35,9 +35,9 @@ class transform(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # embed
-        vectors = ai.embedding_model.model.encode(request.data['texts'])
+        embeds = ai.embedding_model.encode(request.data['texts'])
 
-        return Response({'vectors': vectors}, status=status.HTTP_200_OK)
+        return Response({'vectors': embeds}, status=status.HTTP_200_OK)
 
 
 class matchSkills(views.APIView):
@@ -52,7 +52,7 @@ class matchSkills(views.APIView):
         texts = request.data['texts']
 
         # embed all texts in batch
-        embeds = ai.embedding_model.model.encode(texts)
+        embeds = ai.embedding_model.encode(texts)
 
         results = []
         # find skills for each text/vector and populate results
@@ -98,7 +98,7 @@ class matchSkillsEmbeds(views.APIView):
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
 
-    @silk_profile(name='Adjacent skills')
+    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
@@ -258,7 +258,7 @@ class queryIndex(views.APIView):
 
 class modelAutocomplete(views.APIView):
 
-    @silk_profile(name='Model autocomplete')
+    @silk_profile(name=SILKY_DEBUG_STR+'Model autocomplete')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
@@ -290,7 +290,7 @@ class modelAutocomplete(views.APIView):
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
 
-    @silk_profile(name='Adjacent skill content')
+    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skill content')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
@@ -356,7 +356,7 @@ class adjacentSkillContent(views.APIView):
 class searchContent(views.APIView):
     """ search for content based on skills """
 
-    @silk_profile(name='Search content')
+    @silk_profile(name=SILKY_DEBUG_STR+'Search content')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.searchContentSchema)
@@ -550,7 +550,7 @@ class topic(views.APIView):
             return Response({'status': 'exists', 'response': f'topic {name} already exists'}, status=status.HTTP_302_FOUND)
         else:
             topic = Topic()
-            topic.create(name)
+            topic.create(name, ai.embedding_model.encode([name])[0])
             topic.save()
             threading.Thread(target=index.topic_index.generate_index).start()
             return Response({'status': 'success', 'response': f'{name} created'}, status=status.HTTP_201_CREATED)

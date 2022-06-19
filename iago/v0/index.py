@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 class VectorIndex():
     """ Index class for semantic embedding and implementing vector search """
-    embedding_model = embedding_model.model
 
     def __init__(self, iterable: Iterable):
         self.iterable = iterable
@@ -104,7 +103,7 @@ class VectorIndex():
         start = time.perf_counter()
 
         if type(query) == str:
-            query_vector = np.array(self.embedding_model.encode([query])).astype(np.float32)
+            query_vector = embedding_model.encode([query])[0].astype(np.float32)
         elif type(query) == np.ndarray:
             query_vector = np.array([query]).astype(np.float32)
         elif type(query) == list:
