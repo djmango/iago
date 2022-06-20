@@ -175,6 +175,9 @@ class Content(models.Model):
     skills = models.ManyToManyField(Skill)
     popularity = models.JSONField(default=dict)
     deleted = models.BooleanField(default=False)
+    markdown = models.TextField(blank=True, null=True)
+    last_response = models.JSONField(default=dict)
+    summary = models.JSONField(default=dict)
 
     class types(models.TextChoices):
         article = 'article'
