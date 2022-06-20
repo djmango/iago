@@ -110,7 +110,7 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']])] # skills is a list of results lists, but we only ask for 1 result per
+        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) != 0] # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
         pool.close()
 
         adjacent_skills = []
@@ -120,7 +120,7 @@ class adjacentSkills(views.APIView):
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
                 skills_ranked = list(zip(*rankings))[0]
 
-                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
+                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:k+1]})
 
         return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
 
