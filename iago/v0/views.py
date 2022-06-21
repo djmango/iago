@@ -60,7 +60,7 @@ class matchSkills(views.APIView):
         for embed in embeds:
             # find the closest skills
             skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = list(zip(*rankings))[0] # rankings are keyed by pk which in skill objects case is the name
+            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
@@ -85,7 +85,7 @@ class matchSkillsEmbeds(views.APIView):
         for embed in request.data['embeds']:
             # find the closest skills
             skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = list(zip(*rankings))[0] # rankings are keyed by pk which in skill objects case is the name
+            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
 
             # add to results
             results.append({
@@ -110,7 +110,8 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) > 0] # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
+        # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
+        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) > 0]
         pool.close()
 
         adjacent_skills = []
@@ -124,13 +125,14 @@ class adjacentSkills(views.APIView):
 
         return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
 
+
 def updateArticle(article_uuid):
     """ seperate function for job pooling """
     start = time.perf_counter()
     article: Content = Content.objects.get(uuid=article_uuid)
 
     postID = article.url.split('/')[-1].split('-')[-1]
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'} # lol idk it might work
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'}  # lol idk it might work
     try:
         r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
 
@@ -189,7 +191,7 @@ def updateArticle(article_uuid):
                 text = medium_to_markdown(text_block, paragraphs_raw[i-1]['type'])
             else:
                 text = medium_to_markdown(text_block, None)
-            
+
             output += text
         article.markdown = output
 
@@ -208,7 +210,7 @@ def updateArticle(article_uuid):
             img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1)[0][0]
             article.thumbnail_alternative = img
             article.thumbnail_alternative_url = img.photo_image_url
-        
+
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
     except Exception as e:
@@ -218,6 +220,7 @@ def updateArticle(article_uuid):
             article.deleted = True
             logger.error(f'Logging {article.title} as deleted')
             article.save()
+
 
 class updateContent(views.APIView):
     """ update scraped articles with their medium data """
@@ -240,7 +243,7 @@ class updateContent(views.APIView):
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
-# TODO: create cache for embeddings or maybe a database call since they are deterministic
+
 class queryIndex(views.APIView):
 
     def get(self, request):
@@ -270,6 +273,7 @@ class queryIndex(views.APIView):
             results_ranked.append(results.filter(pk=pk).values().first())
 
         return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
+
 
 class modelAutocomplete(views.APIView):
 
@@ -396,7 +400,7 @@ class searchContent(views.APIView):
 
         # if we have a query then we want to search content titles for it
         if query_string:
-            results, rankings, query_vector = index.content_index.query(query_string, k=k*(page+2)) # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
+            results, rankings, query_vector = index.content_index.query(query_string, k=k*(page+2))  # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
             content_to_return |= results
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
@@ -484,7 +488,7 @@ class recomendContent(views.APIView):
         temperature = float(request.data['temperature']/100) if 'temperature' in request.data else 0
         results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature)
         content_to_return = results
-        
+
         # apply filters
         content_type = request.data['type'] if 'type' in request.data else None
         length = request.data['length'] if 'length' in request.data else None
@@ -508,7 +512,7 @@ class recomendContent(views.APIView):
         # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
         content_ids_to_return_ranked = []
         for content_id_ranked, score in rankings:
-            if content_id_ranked in content_ids_to_return: # ensure the result passed our filters
+            if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
                 content_ids_to_return_ranked.append(content_id_ranked)
 
         logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
@@ -534,7 +538,7 @@ class jobSkillMatch(views.APIView):
 
         # search index
         start = time.perf_counter()
-        
+
         results, rankings, query_vector = index.skills_index.query(job.embedding_all_mpnet_base_v2, k=k)
         skills_ranked = list(zip(*rankings))[0]
         logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')

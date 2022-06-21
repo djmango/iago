@@ -146,7 +146,7 @@
         "FARGATE"
     ],
     "networkMode": "awsvpc",
-    "cpu": "1024",
+    "cpu": "2048",
     "inferenceAccelerators": null,
     "proxyConfiguration": null,
     "volumes": [],
