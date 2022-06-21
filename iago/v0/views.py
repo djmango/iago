@@ -70,7 +70,6 @@ class matchSkills(views.APIView):
 
         return Response({'results': results}, status=status.HTTP_200_OK)
 
-# TODO: merge these two functions
 
 class matchSkillsEmbeds(views.APIView):
     """ take embeds return their related skills """
