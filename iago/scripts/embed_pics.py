@@ -9,8 +9,8 @@ from v0.models import UnsplashPhoto
 
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
-TIMES_TO_REPEAT = 1
-ITEMS_PER_LOOP = 10000
+TIMES_TO_REPEAT = 5
+ITEMS_PER_LOOP = 50000
 
 for i in range(TIMES_TO_REPEAT):
     print(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=False).exclude(ai_description='').count())

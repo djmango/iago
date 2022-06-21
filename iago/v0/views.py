@@ -1,6 +1,6 @@
 import json
 import logging
-import re
+import os
 import threading
 import time
 from multiprocessing.pool import ThreadPool
@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
+from v0.article import medium_to_markdown
 from v0.models import Content, Job, Skill, Topic
 from v0.serializers import TopicSerializerAll
 from v0.utils import clean_str, search_fuzzy_cache
@@ -127,14 +128,16 @@ class adjacentSkills(views.APIView):
 def updateArticle(article_uuid):
     """ seperate function for job pooling """
     start = time.perf_counter()
-
     article: Content = Content.objects.get(uuid=article_uuid)
 
     postID = article.url.split('/')[-1].split('-')[-1]
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'} # lol idk it might work
     try:
-        r = requests.get(f'https://medium.com/_/api/posts/{postID}')
+        r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
+
         if not r.status_code == 200:
-            raise Exception(f'Failed to get article {article.title}, status code {r.status_code}')
+            logger.error(f'Failed to get article {article.title}, status code {r.status_code}')
+            return
             # cause slowdown on 429
         data = json.loads(r.text[16:])
 
@@ -179,6 +182,19 @@ def updateArticle(article_uuid):
 
         article.content = '\n\n'.join(paragraphs)
 
+        # markdown time
+        paragraphs_raw = data['payload']['value']['content']['bodyModel']['paragraphs']
+        output = ""
+        for i, text_block in enumerate(paragraphs_raw):
+            if i > 0:
+                text = medium_to_markdown(text_block, paragraphs_raw[i-1]['type'])
+            else:
+                text = medium_to_markdown(text_block, None)
+            
+            output += text
+        article.markdown = output
+
+        # tags
         for t in post['virtuals']['tags']:
             if t['type'] == 'Tag':
                 if t['slug'] not in article.tags:
@@ -188,11 +204,11 @@ def updateArticle(article_uuid):
         if '.gif' in article.thumbnail or article.thumbnail == 'https://miro.medium.com/':
             article.thumbnail = None
 
-        # get us an alternate thumbnail from our images library
-        # if article.thumbnail_alternative is None or article.thumbnail_alternative_url is None or not article.thumbnail_alternative.url_alive:
-        #     img = index.image_index.query(article.embedding_all_mpnet_base_v2, k=1)[0][0]
-        #     article.thumbnail_alternative = img
-        #     article.thumbnail_alternative_url = img.url
+        # get us an alternate thumbnail from our unsplash images library
+        if article.thumbnail_alternative is None or article.thumbnail_alternative_url is None:
+            img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1)[0][0]
+            article.thumbnail_alternative = img
+            article.thumbnail_alternative_url = img.photo_image_url
         
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')

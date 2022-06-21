@@ -1,28 +1,6 @@
-# import header
-
-import requests
 import re
-import json
 
-def insert_string_by_index(string1, string2, start_i, stop_i):
-    return string1[:start_i] + string2 + string1[stop_i:]
-
-
-url = "https://serverless.iago.jeeny.ai:443/medium/"
-
-payload = json.dumps({
-    "url": "https://medium.com/serverlessguru/amazon-api-gateway-http-apis-with-the-serverless-framework-7be95f305318"
-})
-headers = {
-    'Authorization': 'Basic e3tVU0VSfX06e3tQQVNTfX0=',
-    'Content-Type': 'application/json'
-}
-
-response = requests.post(url, headers=headers, data=payload)
-paragraphs = response.json()['payload']['value']['content']['bodyModel']['paragraphs']
-output = ""
-
-def medium_to_markdown(text_block, last_type, i=0) -> str:
+def medium_to_markdown(text_block, last_type) -> str:
     # medium types
 
     # text blocks
@@ -72,7 +50,7 @@ def medium_to_markdown(text_block, last_type, i=0) -> str:
     if text_block['type'] == 1: # normal text
         pass
     elif text_block['type'] == 3: # header
-        if i == 0: # title
+        if last_type == None: # title
             text = f"# {text}"
         else:
             text = f"## {text}"
@@ -104,16 +82,3 @@ def medium_to_markdown(text_block, last_type, i=0) -> str:
         text = f"{text}\n\n"
 
     return str(text)
-
-for i, text_block in enumerate(paragraphs):
-    if i > 0:
-        text = medium_to_markdown(text_block, paragraphs[i-1]['type'])
-    else:
-        text = medium_to_markdown(text_block, None)
-    
-    output += text
-
-with open('medium_ingestion_method.md', 'w') as f:
-    f.write(output)
-
-print('done!')

@@ -119,17 +119,19 @@ class VectorIndex():
             p = 1
 
         # generate a unique deterministic string to cache the results
-        cache_key = self._generate_cache_key(query_vector, k*p)
-        self.logger.info(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
-        cached_results = cache.get(cache_key)
+        if use_cached:
+            cache_key = self._generate_cache_key(query_vector, k*p)
+            self.logger.info(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
+            cached_results = cache.get(cache_key)
 
-        if cached_results and use_cached:  # if we got results just depickle them
+        if use_cached and cached_results:  # if we got results just depickle them
             values, indices = cached_results
             self.logger.info(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
             # store the results as a tuple of np.ndarrays to be able to depickle easily later
-            cache.set(cache_key, (values, indices), timeout=60*60*24*7)  # 7 day timeout
+            if use_cached:
+                cache.set(cache_key, (values, indices), timeout=60*60*24*7)  # 7 day timeout
             self.logger.info(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
