@@ -27,21 +27,24 @@ class Model():
         self.model = SentenceTransformer(self.name, cache_folder=HERE/'models')
         self.model.max_seq_length = self.max_seq_length
 
-    def encode(self, strings: list[str]):
+    def encode(self, strings: list[str], use_cache=True, show_progress_bar=False):
         """ gets embeds from strings from cache if availablbe, else embeds strings and saves to cache and returns"""
         start = time.perf_counter()
 
         # first get what we can from cache and build a list of ones we still need to embed
-        strings = [s.lower() for s in strings]
-        cache = list(GenericStringEmbedding.objects.filter(name__in=strings))
-        cached_strings = [x.name for x in cache] # so we know what we have
-        uncached_strings = [x for x in strings if x not in cached_strings]
-        logger.info(f'Embedder got {len(cached_strings)}/{len(strings)} from cache in {time.perf_counter()-start:.3f}s')
-        
+        if use_cache:
+            strings = [s.lower() for s in strings]
+            cache = list(GenericStringEmbedding.objects.filter(name__in=strings))
+            cached_strings = [x.name for x in cache] # so we know what we have
+            uncached_strings = [x for x in strings if x not in cached_strings]
+            logger.info(f'Embedder got {len(cached_strings)}/{len(strings)} from cache in {time.perf_counter()-start:.3f}s')
+        else:
+            uncached_strings = strings
+
         # next embed the ones we still need and save to cache
         new_cache = []
-        if len(uncached_strings) > 0:
-            new_embeds = self.model.encode(uncached_strings)
+        if not use_cache or len(uncached_strings) > 0:
+            new_embeds = self.model.encode(uncached_strings, show_progress_bar=show_progress_bar)
             for i, string in enumerate(uncached_strings):
                 new_cache.append(GenericStringEmbedding().create(string, new_embeds[i]))
 

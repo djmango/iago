@@ -11,7 +11,7 @@ from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Skill, Topic
+from v0.models import Content, Skill, Topic, UnsplashPhoto
 from v0.utils import get_hash
 
 HERE = Path(__file__).parent
@@ -145,8 +145,9 @@ class VectorIndex():
 topic_index: VectorIndex
 skills_index: VectorIndex
 content_index: VectorIndex
-image_index: VectorIndex
+unsplash_photo_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
-skills_index = VectorIndex(Skill.objects.all())
+    skills_index = VectorIndex(Skill.objects.all())
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))

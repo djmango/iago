@@ -110,7 +110,7 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) != 0] # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
+        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) > 0] # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
         pool.close()
 
         adjacent_skills = []
@@ -197,12 +197,12 @@ def updateArticle(article_uuid):
         article.save()
         logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
     except Exception as e:
-        logger.error(str(e))  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
-        if 'Post was removed by the user' or 'Account is suspended' in str(e):
+        err = str(e)
+        logger.error(err)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
+        if 'Post was removed by the user' in err or 'Account is suspended' in err:
             article.deleted = True
             logger.error(f'Logging {article.title} as deleted')
             article.save()
-
 
 class updateContent(views.APIView):
     """ update scraped articles with their medium data """
@@ -220,7 +220,7 @@ class updateContent(views.APIView):
         logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
         logger.info(f'Updating data for {len(articles_uuid)} articles')
 
-        pool = ThreadPool(processes=5)
+        pool = ThreadPool(processes=4)
         pool.map_async(updateArticle, articles_uuid)
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
@@ -307,10 +307,10 @@ class adjacentSkillContent(views.APIView):
 
         start = time.perf_counter()
 
-        # pool = ThreadPool(processes=MAX_DB_THREADS)
-        # skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills])]
-        # pool.close()
-        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+        pool = ThreadPool(processes=MAX_DB_THREADS)
+        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]) if len(x) > 0]
+        pool.close()
+        # skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
         logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
         skills = [x for x in skills if x is not None]  # remove none values
 
@@ -387,7 +387,7 @@ class searchContent(views.APIView):
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
             pool = ThreadPool(processes=MAX_DB_THREADS)
-            skills.extend([x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills])])
+            skills.extend([x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]) if len(x) > 0])
             pool.close()
             logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
             skills = [x for x in skills if x is not None]  # remove none values

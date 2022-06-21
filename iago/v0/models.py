@@ -60,6 +60,7 @@ class SkillCluster(models.Model):
             return str(self.id)
 
 # -- Unsplash Data --
+# a NOTE for all these, for some reason the empty text fields got set to '' instead of null, so beware
 
 
 class UnsplashCollection(models.Model):
@@ -69,7 +70,6 @@ class UnsplashCollection(models.Model):
     photo_collected_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = 'unsplash_collections'
         unique_together = (('photo_id', 'collection_id'),)
 
@@ -85,7 +85,6 @@ class UnsplashColor(models.Model):
     ai_score = models.FloatField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = 'unsplash_colors'
         unique_together = (('photo_id', 'hex'),)
 
@@ -99,7 +98,6 @@ class UnsplashConversion(models.Model):
     conversion_country = models.CharField(max_length=2, blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = 'unsplash_conversions'
 
 
@@ -111,12 +109,12 @@ class UnsplashKeyword(models.Model):
     suggested_by_user = models.BooleanField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = 'unsplash_keywords'
         unique_together = (('photo_id', 'keyword'),)
 
 
 class UnsplashPhoto(models.Model):
+    # imported fields
     photo_id = models.CharField(primary_key=True, max_length=11)
     photo_url = models.CharField(max_length=255, blank=True, null=True)
     photo_image_url = models.CharField(max_length=255, blank=True, null=True)
@@ -148,9 +146,10 @@ class UnsplashPhoto(models.Model):
     ai_primary_landmark_longitude = models.FloatField(blank=True, null=True)
     ai_primary_landmark_confidence = models.CharField(max_length=255, blank=True, null=True)
     blur_hash = models.CharField(max_length=255, blank=True, null=True)
+    # new fields
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, null=True, blank=True)
 
     class Meta:
-        managed = False
         db_table = 'unsplash_photos'
 
 
