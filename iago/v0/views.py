@@ -136,16 +136,23 @@ def updateArticle(article_uuid):
     try:
         r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
 
-        if not r.status_code == 200:
+        if not r.status_code == 200:  # unsuccessful request handling
             logger.error(f'Failed to get article {article.title}, status code {r.status_code}')
-            if r.status_code == 410: # gone
+            if r.status_code == 410:  # gone
                 logger.info(f'Article {article.title} is 410 gone, deleting')
                 article.deleted = True
                 article.save()
-            elif r.status_code == 429:
-                logger.info(f'429, headers are {r.headers}')
-            return
-            # cause slowdown on 429
+                return
+            elif r.status_code == 429:  # we need to wait
+                retry_time = int(r.headers['Retry-After'])
+                logger.info(f'Article {article.title} is 429 throttled, retrying in {retry_time} seconds')
+                time.sleep(retry_time)  # wait to retry, usually like an hour so its gonna be sitting here a while but thats fine
+                # retry, print new headers for debug
+                r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
+                logger.debug(f'retried after 429, new headers are {r.headers}')
+            else:
+                return
+
         data = json.loads(r.text[16:])
 
         # if user deleted the article or their account then we mark it as deleted
@@ -195,7 +202,7 @@ def updateArticle(article_uuid):
         for i, text_block in enumerate(paragraphs_raw):
             text = medium_to_markdown(text_block, i, paragraphs_raw)
 
-            output += text #TODO: FIX TYPE 7 and the rest that pop up
+            output += text  # TODO: FIX TYPE 7 and the rest that pop up
         article.markdown = output
 
         # tags
