@@ -26,7 +26,7 @@ def medium_to_markdown(text_block: dict, i: int, paragraphs_raw: list[dict]) -> 
     original_text = text_block['text']
     markdown_text = ""
     last_index = 0
-    if len(text_block['markups']) > 0:
+    if 'markups' in text_block and len(text_block['markups']) > 0:
         for markup in text_block['markups']:
             modified_subtext = original_text[markup['start']-last_index:markup['end']-last_index] # we only want to edit the part that has the rule applied to it
             if markup['type'] == 1:
