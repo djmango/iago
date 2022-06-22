@@ -153,4 +153,4 @@ if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())
-unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:100000])
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:100000])

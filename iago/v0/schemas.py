@@ -68,7 +68,7 @@ queryKIndexSchema = {
         },
         "index": {
             "type": "string",
-            "enum": ["topic", "skill", "content"]
+            "enum": ["topic", "skill", "content", "unsplash"]
         },
         "k": {
             "type": "integer",

@@ -262,6 +262,8 @@ class queryIndex(views.APIView):
             query_index = index.skills_index
         elif index_choice == 'content':
             query_index = index.content_index
+        elif index_choice == 'unsplash':
+            query_index = index.unsplash_photo_index
         else:
             return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 

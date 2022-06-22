@@ -33,7 +33,7 @@ def medium_to_markdown(text_block: dict, i: int, paragraphs_raw: list[dict]) -> 
                 modified_subtext = "**" + modified_subtext + "**"
             elif markup['type'] == 2:
                 modified_subtext = "*" + modified_subtext + "*"
-            elif markup['type'] == 3:
+            elif markup['type'] == 3 and 'href' in markup: # sometimes its linking to an internal reference like a user or something so we dont need to link that right now
                 modified_subtext = "[" + modified_subtext + "]" + "(" + markup['href'] + ")"
             
             markdown_text += original_text[:markup['start']-last_index] + modified_subtext
