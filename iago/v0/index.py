@@ -81,7 +81,7 @@ class VectorIndex():
 
         # get indices in the global index of the results we want to keep
         cleaned_indices = [int(x) for i, x in enumerate(indices[0]) if i not in results_to_remove]
-        self.logger.info(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
+        self.logger.debug(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
 
         return cleaned_indices
 
@@ -121,18 +121,18 @@ class VectorIndex():
         # generate a unique deterministic string to cache the results
         if use_cached:
             cache_key = self._generate_cache_key(query_vector, k*p)
-            self.logger.info(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
+            self.logger.debug(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
             cached_results = cache.get(cache_key)
 
         if use_cached and cached_results:  # if we got results just depickle them
             values, indices = cached_results
-            self.logger.info(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
+            self.logger.debug(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
             # store the results as a tuple of np.ndarrays to be able to depickle easily later
             if use_cached:
                 cache.set(cache_key, (values, indices), timeout=60*60*24*7)  # 7 day timeout
-            self.logger.info(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
+            self.logger.debug(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:

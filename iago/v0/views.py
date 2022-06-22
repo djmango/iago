@@ -139,8 +139,11 @@ def updateArticle(article_uuid):
         if not r.status_code == 200:
             logger.error(f'Failed to get article {article.title}, status code {r.status_code}')
             if r.status_code == 410: # gone
+                logger.info(f'Article {article.title} is 410 gone, deleting')
                 article.deleted = True
                 article.save()
+            elif r.status_code == 429:
+                logger.info(f'429, headers are {r.headers}')
             return
             # cause slowdown on 429
         data = json.loads(r.text[16:])
