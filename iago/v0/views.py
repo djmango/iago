@@ -138,6 +138,9 @@ def updateArticle(article_uuid):
 
         if not r.status_code == 200:
             logger.error(f'Failed to get article {article.title}, status code {r.status_code}')
+            if r.status_code == 410: # gone
+                article.deleted = True
+                article.save()
             return
             # cause slowdown on 429
         data = json.loads(r.text[16:])
@@ -147,7 +150,6 @@ def updateArticle(article_uuid):
             logger.error(f'Failed to get article {article.url}, {data["error"]}')
             if 'deleted' in data['error']:  # though its possible we just got rate limited, so make sure to check the error
                 article.deleted = True
-                article.updated_on = Now()
                 article.save()
             return
         else:
@@ -157,6 +159,7 @@ def updateArticle(article_uuid):
 
         article.url = post['mediumUrl']
         article.title = post['title']
+        article.last_response = data
 
         # author is annoying
         if 'references' in data['payload'] and 'User' in data['payload']['references']:
@@ -187,12 +190,9 @@ def updateArticle(article_uuid):
         paragraphs_raw = data['payload']['value']['content']['bodyModel']['paragraphs']
         output = ""
         for i, text_block in enumerate(paragraphs_raw):
-            if i > 0:
-                text = medium_to_markdown(text_block, paragraphs_raw[i-1]['type'])
-            else:
-                text = medium_to_markdown(text_block, None)
+            text = medium_to_markdown(text_block, i, paragraphs_raw)
 
-            output += text
+            output += text #TODO: FIX TYPE 7 and the rest that pop up
         article.markdown = output
 
         # tags
@@ -207,7 +207,7 @@ def updateArticle(article_uuid):
 
         # get us an alternate thumbnail from our unsplash images library
         if article.thumbnail_alternative is None or article.thumbnail_alternative_url is None:
-            img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1)[0][0]
+            img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
             article.thumbnail_alternative = img
             article.thumbnail_alternative_url = img.photo_image_url
 

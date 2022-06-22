@@ -1,6 +1,6 @@
 import re
 
-def medium_to_markdown(text_block, last_type) -> str:
+def medium_to_markdown(text_block: dict, i: int, paragraphs_raw: list[dict]) -> str:
     # medium types
 
     # text blocks
@@ -8,10 +8,13 @@ def medium_to_markdown(text_block, last_type) -> str:
     # 3 is header
     # 4 is image
     # 6 is quote
+    # 7 is also quote block
     # 8 is code block
     # 9 is bullet list
+    # 10 is numbered list
     # 11 is iframe, not easy to handle
     # 13 is a subtitle
+    # 14 is an embedded link
 
     # markup
     # 1 is bold
@@ -46,6 +49,10 @@ def medium_to_markdown(text_block, last_type) -> str:
     # text = text.replace('_', '\_').replace('*', '\*').replace('`', '\`')
     text = markdown_text
 
+    if i > 0:
+        last_type = paragraphs_raw[i-1]['type']
+    else:
+        last_type = None
     # then we format the whole block according to the type
     if text_block['type'] == 1: # normal text
         pass
@@ -60,16 +67,34 @@ def medium_to_markdown(text_block, last_type) -> str:
             raise ValueError(f'Block {text_block["id"]} has no image id or is not a png')
         image_url = f'https://miro.medium.com/{text_block["metadata"]["id"]}'
         text = f'![alt text]({image_url} "{text}")\n\n{text}' # add a caption on hover and below
-    elif text_block['type'] == 6: # quote
+    elif text_block['type'] == 6 or text_block['type'] == 7: # quote
         text = f'> {text}'
     elif text_block['type'] == 8: # code block or quote, dont set language cuz we dont know it
         text = f"```\n{text}\n```"
     elif text_block['type'] == 9: # bullet list
         text = f"* {text}"
+    elif text_block['type'] == 10: # numbered list
+        if last_type == 10: # if this is a continuation of a numbered list we have to backtrack to the previous find the current number
+            k = 1
+            while 1:
+                if paragraphs_raw[i-k]['type'] == 10:
+                    k += 1
+                else:
+                    break
+            text = f"{k+1}. {text}" # essentially we keep looking back 1 until we find the top of the numbered list to keep the function self contained
+        else:
+            text = f"1. {text}" # if this is the first number we can just use 1 without checks
+
     elif text_block['type'] == 11: # iframe, just post the thumbnail. TODO: actual embeds are going to be a bit more difficult
-        text = f'![alt text]({text_block["iframe"]["thumbnailurl"]} "{text}"'
+        if 'thumbnailurl' in text_block['iframe']:
+            text = f'![alt text]({text_block["iframe"]["thumbnailurl"]} "{text}"'
+        else:
+            text = f'MEDIUM_IFRAME_RESOURCE_({text_block["iframe"]["mediaResourceId"]} "{text}"'
     elif text_block['type'] == 13: # subtitle
         text = f"### {text}"
+    elif text_block['type'] == 14: # embedded link
+        # here the text is actually already nicely in markdown format
+        pass
     else: # unknown type
         print(f'Unknown type {text_block["type"]} for id {text_block["name"]}')
 

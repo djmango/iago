@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class VectorIndex():
     """ Index class for semantic embedding and implementing vector search """
 
-    def __init__(self, iterable: Iterable):
+    def __init__(self, iterable: QuerySet):
         self.iterable = iterable
         if type(iterable) == QuerySet:
             self.logger = logging.getLogger(f'VectorIndex_{self.iterable.model.__name__}')
@@ -140,7 +140,8 @@ class VectorIndex():
         else:
             cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
         
-        results: QuerySet = self.iterable.filter(pk__in=[self.pks[x] for x in cleaned_indices])
+        # the iterable could be sliced to ensure that we are using a new queryset to filter the results
+        results: QuerySet = self.iterable.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])
         rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, values.tolist()[0])]
         return results, rankings, query_vector
 
@@ -152,4 +153,4 @@ if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
     skills_index = VectorIndex(Skill.objects.all())
-    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
+unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:100000])

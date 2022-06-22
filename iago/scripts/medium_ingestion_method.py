@@ -8,7 +8,7 @@ def insert_string_by_index(string1, string2, start_i, stop_i):
     return string1[:start_i] + string2 + string1[stop_i:]
 
 
-url = "https://serverless.iago.jeeny.ai:443/medium/"
+url = "https://serverless.iago.jeeny.ai:443/medium"
 
 payload = json.dumps({
     "url": "https://medium.com/serverlessguru/amazon-api-gateway-http-apis-with-the-serverless-framework-7be95f305318"
