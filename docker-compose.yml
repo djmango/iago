@@ -24,3 +24,18 @@ services:
         restart: unless-stopped
         depends_on:
             - django
+
+    # redis:
+    #     image: redis
+
+    # datadog:
+    #     build: datadog
+    #     links:
+    #         - redis # ensures that redis is a host that the container can find
+    #         - django # ensures that the web app can send metrics
+    #     environment:
+    #         - DD_API_KEY=dddddd
+    #     volumes:
+    #         - /var/run/docker.sock:/var/run/docker.sock
+    #         - /proc/:/host/proc/:ro
+    #         - /sys/fs/cgroup:/host/sys/fs/cgroup:ro

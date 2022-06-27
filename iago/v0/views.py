@@ -10,10 +10,9 @@ import numpy as np
 import requests
 from django.db.models import Q
 from django.db.models.functions import Now
-from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS, SILKY_DEBUG_STR
+from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 from rest_framework import status, views
 from rest_framework.response import Response
-from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.article import medium_to_markdown
@@ -98,7 +97,6 @@ class matchSkillsEmbeds(views.APIView):
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
 
-    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
@@ -289,7 +287,6 @@ class queryIndex(views.APIView):
 
 class modelAutocomplete(views.APIView):
 
-    @silk_profile(name=SILKY_DEBUG_STR+'Model autocomplete')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
@@ -321,7 +318,6 @@ class modelAutocomplete(views.APIView):
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
 
-    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skill content')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
@@ -387,7 +383,6 @@ class adjacentSkillContent(views.APIView):
 class searchContent(views.APIView):
     """ search for content based on skills """
 
-    @silk_profile(name=SILKY_DEBUG_STR+'Search content')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.searchContentSchema)

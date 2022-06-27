@@ -83,8 +83,10 @@
             }
         },
         {
-            "dnsSearchDomains": null,
-            "environmentFiles": [],
+            "image": "237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago:nginx-latest",
+            "name": "iago-nginx",
+            "cpu": 0,
+            "memoryReservation": 256,
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -93,55 +95,15 @@
                     "awslogs-stream-prefix": "ecs"
                 }
             },
-            "entryPoint": null,
             "portMappings": [{
-                    "hostPort": 80,
-                    "protocol": "tcp",
-                    "containerPort": 80
-                }
-            ],
-            "command": null,
-            "linuxParameters": null,
-            "cpu": 0,
-            "environment": null,
-            "resourceRequirements": null,
-            "ulimits": null,
-            "dnsServers": null,
-            "mountPoints": null,
-            "workingDirectory": null,
-            "secrets": null,
-            "dockerSecurityOptions": null,
-            "memoryReservation": 256,
-            "volumesFrom": null,
-            "stopTimeout": null,
-            "image": "237339178325.dkr.ecr.eu-central-1.amazonaws.com/iago:nginx-latest",
-            "startTimeout": null,
-            "firelensConfiguration": null,
-            "dependsOn": null,
-            "disableNetworking": null,
-            "interactive": null,
-            "healthCheck": null,
-            "essential": true,
-            "links": [],
-            "hostname": null,
-            "extraHosts": null,
-            "pseudoTerminal": null,
-            "user": null,
-            "readonlyRootFilesystem": null,
-            "dockerLabels": null,
-            "systemControls": null,
-            "privileged": null,
-            "name": "iago-nginx",
-            "repositoryCredentials": {
-                "credentialsParameter": ""
-            }
+                "hostPort": 80,
+                "protocol": "tcp",
+                "containerPort": 80
+            }]
         }
     ],
-    "placementConstraints": [],
     "memory": "16384",
-    "taskRoleArn": "",
     "family": "iago-taskdef",
-    "pidMode": null,
     "requiresCompatibilities": [
         "FARGATE"
     ],

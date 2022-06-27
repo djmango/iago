@@ -36,33 +36,6 @@ MAX_DB_THREADS = 16
 
 LOGIN_URL = '/admin/login/'
 
-# silk profiling
-# SILKY_PYTHON_PROFILER = True
-SILKY_PYTHON_PROFILER_BINARY = True
-SILKY_AUTHENTICATION = True  # User must login
-SILKY_AUTHORISATION = True  # User must have permissions
-SILKY_MAX_REQUEST_BODY_SIZE = -1  # Silk takes anything <0 as no limit
-SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # If response body>1024 bytes, ignore
-SILKY_MAX_RECORDED_REQUESTS = 10 ** 4
-SILKY_META = True
-SILKY_ANALYZE_QUERIES = True
-SILKY_EXPLAIN_FLAGS = {'format':'JSON', 'costs': True}
-SILKY_PYTHON_PROFILER_RESULT_PATH = BASE_DIR/'.tmp/'
-os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
-# if we are in debug prepend the call names with that
-SILKY_DEBUG_STR = 'DEBUG ' if DEBUG else ''
-# silky ignores
-SILKY_INTERCEPT_PERCENT = 100 if DEBUG else 10 # %
-SILKY_IGNORE_PATHS = ['/alive']
-NOT_PROFILE_URLS = ['/alive', '/silk', '/admin', '/static']
-def run_silk(request): # WSGI request
-    # always log in debug, and for prod log all that under the above list
-    if DEBUG or not any(x in request.path_info for x in NOT_PROFILE_URLS):
-        return True
-    else:
-        return False
-SILKY_PYTHON_PROFILER_FUNC = run_silk # profile only session has recording enabled.
-
 # django host and trust
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
@@ -81,8 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
-    'silk'
-    # 'drf_yasg',
+    # 'ddtrace.contrib.django'
 ]
 
 if DEBUG:
@@ -97,7 +69,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'silk.middleware.SilkyMiddleware',
 ]
 
 # https://docs.djangoproject.com/en/4.0/topics/cache/#database-caching-1
