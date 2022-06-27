@@ -27,8 +27,6 @@ SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
     print('DJANGO SETTINGS IN DEBUG')
-    # import newrelic.agent
-    # newrelic.agent.initialize(HERE.parent/'newrelic.ini')
 else:
     DEBUG = False
     print('DJANGO SETTINGS IN PRODUCTION')
@@ -39,7 +37,7 @@ MAX_DB_THREADS = 16
 LOGIN_URL = '/admin/login/'
 
 # silk profiling
-SILKY_PYTHON_PROFILER = True
+# SILKY_PYTHON_PROFILER = True
 SILKY_PYTHON_PROFILER_BINARY = True
 SILKY_AUTHENTICATION = True  # User must login
 SILKY_AUTHORISATION = True  # User must have permissions
@@ -50,15 +48,16 @@ SILKY_META = True
 SILKY_ANALYZE_QUERIES = True
 SILKY_EXPLAIN_FLAGS = {'format':'JSON', 'costs': True}
 SILKY_PYTHON_PROFILER_RESULT_PATH = BASE_DIR/'.tmp/'
-# SILKY_INTERCEPT_PERCENT = 50 # log only 50% of requests
 os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
 # if we are in debug prepend the call names with that
 SILKY_DEBUG_STR = 'DEBUG ' if DEBUG else ''
-
+# silky ignores
+SILKY_INTERCEPT_PERCENT = 100 if DEBUG else 10 # %
+SILKY_IGNORE_PATHS = ['/alive']
 NOT_PROFILE_URLS = ['/alive', '/silk', '/admin', '/static']
 def run_silk(request): # WSGI request
     # always log in debug, and for prod log all that under the above list
-    if DEBUG and not any(x in request.path for x in NOT_PROFILE_URLS):
+    if DEBUG or not any(x in request.path_info for x in NOT_PROFILE_URLS):
         return True
     else:
         return False
@@ -91,7 +90,6 @@ if DEBUG:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'silk.middleware.SilkyMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -99,6 +97,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'silk.middleware.SilkyMiddleware',
 ]
 
 # https://docs.djangoproject.com/en/4.0/topics/cache/#database-caching-1
@@ -232,7 +231,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
