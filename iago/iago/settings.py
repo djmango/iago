@@ -45,15 +45,26 @@ SILKY_AUTHENTICATION = True  # User must login
 SILKY_AUTHORISATION = True  # User must have permissions
 SILKY_MAX_REQUEST_BODY_SIZE = -1  # Silk takes anything <0 as no limit
 SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # If response body>1024 bytes, ignore
+SILKY_MAX_RECORDED_REQUESTS = 10 ** 4
 SILKY_META = True
 SILKY_ANALYZE_QUERIES = True
 SILKY_EXPLAIN_FLAGS = {'format':'JSON', 'costs': True}
 SILKY_PYTHON_PROFILER_RESULT_PATH = BASE_DIR/'.tmp/'
-os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
 # SILKY_INTERCEPT_PERCENT = 50 # log only 50% of requests
+os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
 # if we are in debug prepend the call names with that
 SILKY_DEBUG_STR = 'DEBUG ' if DEBUG else ''
 
+NOT_PROFILE_URLS = ['/alive', '/silk', '/admin', '/static']
+def run_silk(request): # WSGI request
+    # always log in debug, and for prod log all that under the above list
+    if DEBUG and not any(x in request.path for x in NOT_PROFILE_URLS):
+        return True
+    else:
+        return False
+SILKY_PYTHON_PROFILER_FUNC = run_silk # profile only session has recording enabled.
+
+# django host and trust
 ALLOWED_HOSTS = ['*', '127.0.0.1', '[::1]']
 
 CSRF_TRUSTED_ORIGINS = ['https://api.iago.jeeny.ai']
