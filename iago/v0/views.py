@@ -7,18 +7,16 @@ from multiprocessing.pool import ThreadPool
 
 import jsonschema
 import numpy as np
-import requests
 from django.db.models import Q
-from django.db.models.functions import Now
 from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS
 from rest_framework import status, views
 from rest_framework.response import Response
 
 from v0 import ai, index, schemas
-from v0.article import medium_to_markdown
+from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic
 from v0.serializers import TopicSerializerAll
-from v0.utils import clean_str, search_fuzzy_cache
+from v0.utils import search_fuzzy_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -124,112 +122,6 @@ class adjacentSkills(views.APIView):
         return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
 
 
-def updateArticle(article_uuid):
-    """ seperate function for job pooling """
-    start = time.perf_counter()
-    article: Content = Content.objects.get(uuid=article_uuid)
-
-    postID = article.url.split('/')[-1].split('-')[-1]
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36'}  # lol idk it might work
-    try:
-        r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
-
-        if not r.status_code == 200:  # unsuccessful request handling
-            logger.error(f'Failed to get article {article.title}, status code {r.status_code}')
-            if r.status_code == 410:  # gone
-                logger.info(f'Article {article.title} is 410 gone, deleting')
-                article.deleted = True
-                article.save()
-                return
-            elif r.status_code == 429:  # we need to wait
-                retry_time = int(r.headers['Retry-After'])
-                logger.info(f'Article {article.title} is 429 throttled, retrying in {retry_time} seconds')
-                time.sleep(retry_time)  # wait to retry, usually like an hour so its gonna be sitting here a while but thats fine
-                # retry, print new headers for debug
-                r = requests.get(f'https://medium.com/_/api/posts/{postID}', headers=headers)
-                logger.debug(f'retried after 429, new headers are {r.headers}')
-            else:
-                return
-
-        data = json.loads(r.text[16:])
-
-        # if user deleted the article or their account then we mark it as deleted
-        if data['success'] == False:
-            logger.error(f'Failed to get article {article.url}, {data["error"]}')
-            if 'deleted' in data['error']:  # though its possible we just got rate limited, so make sure to check the error
-                article.deleted = True
-                article.save()
-            return
-        else:
-            article.deleted = False
-
-        post = data['payload']['value']
-
-        article.url = post['mediumUrl']
-        article.title = post['title']
-        article.last_response = data
-
-        # author is annoying
-        if 'references' in data['payload'] and 'User' in data['payload']['references']:
-            article.author = data['payload']['references']['User'].popitem()[1]['name']
-        elif '@' in article.url:
-            article.author = article.url.split('@')[1].split('/')[0]
-
-        article.subtitle = post['virtuals']['subtitle']
-        article.thumbnail = f"https://miro.medium.com/{post['virtuals']['previewImage']['imageId']}"  # https://miro.medium.com/0*5avpGviF6Pf1EyUL.jpg
-        article.content_read_seconds = int(float(post['virtuals']['readingTime'])*60)
-        article.popularity['medium'] = {'totalClapCount': post['virtuals']['totalClapCount']}
-        article.provider = 'medium'
-
-        # NOTE: this is an example of a medium article but its actually a video https://medium.com/@digitalprspctv/vsco-style-images-in-3-simple-steps-photoshop-4de7e74b29c8
-
-        # concat paragraphs
-        paragraphs = []
-        for par in post['content']['bodyModel']['paragraphs']:
-            if par['type'] == 4:
-                if '.gif' in article.thumbnail:  # we dont want gifs as preview, so if we happen to find an image to replace it in the body then we can use that instead
-                    article.thumbnail = f"https://miro.medium.com/{par['metadata']['id']}"
-            else:
-                paragraphs.append(clean_str(par['text']))
-
-        article.content = '\n\n'.join(paragraphs)
-
-        # markdown time
-        paragraphs_raw = data['payload']['value']['content']['bodyModel']['paragraphs']
-        output = ""
-        for i, text_block in enumerate(paragraphs_raw):
-            text = medium_to_markdown(text_block, i, paragraphs_raw)
-
-            output += text  # TODO: FIX TYPE 7 and the rest that pop up
-        article.markdown = output
-
-        # tags
-        for t in post['virtuals']['tags']:
-            if t['type'] == 'Tag':
-                if t['slug'] not in article.tags:
-                    article.tags.append(t['slug'])
-
-        # we really hate gifs - also null out the default image, no point of keeping it
-        if '.gif' in article.thumbnail or article.thumbnail == 'https://miro.medium.com/':
-            article.thumbnail = None
-
-        # get us an alternate thumbnail from our unsplash images library
-        if article.thumbnail_alternative is None or article.thumbnail_alternative_url is None:
-            img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
-            article.thumbnail_alternative = img
-            article.thumbnail_alternative_url = img.photo_image_url
-
-        article.save()
-        logger.info(f'Updated {article.title} in {time.perf_counter()-start:.3f}s')
-    except Exception as e:
-        err = str(e)
-        logger.error(err)  # we do get banned if we have hit too fast - about 10 requests per second i think but not sure
-        if 'Post was removed by the user' in err or 'Account is suspended' in err:
-            article.deleted = True
-            logger.error(f'Logging {article.title} as deleted')
-            article.save()
-
-
 class updateContent(views.APIView):
     """ update scraped articles with their medium data """
 
@@ -307,6 +199,7 @@ class modelAutocomplete(views.APIView):
         else:
             return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # TODO: reimplement reordering
         results = search_fuzzy_cache(model, query, k, similarity_minimum)
         start = time.perf_counter()
         results_pk = list(results.values_list('pk', flat=True))

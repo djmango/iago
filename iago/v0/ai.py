@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, pipeline
 
 from v0.models import GenericStringEmbedding
 
@@ -14,8 +15,10 @@ logger = logging.getLogger(__name__)
 
 os.makedirs(HERE/'models', exist_ok=True)
 
+
 class Model():
     """ simple handler for sentence_transformers models """
+
     def __init__(self, name: str, max_seq_length: int):
         self.name = name
         self.max_seq_length = max_seq_length
@@ -35,7 +38,7 @@ class Model():
         if use_cache:
             strings = [s.lower() for s in strings]
             cache = list(GenericStringEmbedding.objects.filter(name__in=strings))
-            cached_strings = [x.name for x in cache] # so we know what we have
+            cached_strings = [x.name for x in cache]  # so we know what we have
             uncached_strings = [x for x in strings if x not in cached_strings]
             logger.info(f'Embedder got {len(cached_strings)}/{len(strings)} from cache in {time.perf_counter()-start:.3f}s')
         else:
@@ -61,5 +64,19 @@ class Model():
 
         return np.asarray(results)
 
+
 # define embedding model
 embedding_model = Model('all-mpnet-base-v2', max_seq_length=384)
+
+# summarizer model
+
+SUMMARIZER_CONFIG = {
+    'MODEL_NAME': 'sshleifer/distilbart-cnn-12-6',
+    'MAX_TOKENS': 1024,
+    'MIN_LENGTH': 0,
+    'NO_REPEAT_NGRAM_SIZE': 0
+}
+
+# get models
+tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
+summarizer = pipeline('summarization', model=SUMMARIZER_CONFIG['MODEL_NAME'], tokenizer=SUMMARIZER_CONFIG['MODEL_NAME'])
