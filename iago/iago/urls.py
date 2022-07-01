@@ -13,26 +13,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-import v0.views
+from v0.views import alive
 from django.contrib import admin
 from django.urls import include, path
 
-# from drf_yasg.views import get_schema_view
-# from drf_yasg import openapi
-
-# schema_view = get_schema_view(
-#    openapi.Info(
-#       title="Jeeny Iago API",
-#       default_version='v0',
-#       description="ill write this later",
-#    ),
-#    public=False,
-#    permission_classes=[permissions.IsAuthenticated],
-# )
-
 urlpatterns = [
-    # re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    path('alive/', v0.views.alive.as_view(), name='alive'),
+    path('alive/', alive.as_view(), name='alive'),
     path('admin/', admin.site.urls),
     path('v0/', include('v0.urls')),
+    path('silk/', include('silk.urls', namespace='silk'))
 ]

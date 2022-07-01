@@ -56,7 +56,14 @@ def is_valid_json(s: str):
     except ValueError:
         return False
 
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
 #  -- Deterministic Hashing --
+
 
 """
 https://death.andgravity.com/stable-hashing

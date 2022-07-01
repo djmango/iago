@@ -11,7 +11,7 @@ urlpatterns = [
     path('models/autocomplete', views.modelAutocomplete.as_view()),
     path('content/update', views.updateContent.as_view()),
     path('content/search', views.searchContent.as_view()),
-    path('content/recommend', views.recomendContent.as_view()),
+    path('content/recommend', views.recommendContent.as_view()),
     path('content/adjacent_to_skills', views.adjacentSkillContent.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('skillspace/adjacent', views.adjacentSkills.as_view()),

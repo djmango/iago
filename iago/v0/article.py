@@ -227,6 +227,7 @@ def updateArticle(article_uuid):
                 ten_percent = len(clean_text) // 10
                 clean_text = clean_text[:-ten_percent]
 
+            # logger.debug(f"{len(ai.tokenizer(clean_text)['input_ids'])} tokens")
             article.summary[ai.SUMMARIZER_CONFIG['MODEL_NAME']] = ai.summarizer(clean_text, min_length=ai.SUMMARIZER_CONFIG['MIN_LENGTH'], no_repeat_ngram_size=ai.SUMMARIZER_CONFIG['NO_REPEAT_NGRAM_SIZE'])[0]['summary_text']
 
         article.save()

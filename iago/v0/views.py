@@ -8,9 +8,10 @@ from multiprocessing.pool import ThreadPool
 import jsonschema
 import numpy as np
 from django.db.models import Q
-from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS
+from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS, SILKY_DEBUG_STR
 from rest_framework import status, views
 from rest_framework.response import Response
+from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.article import updateArticle
@@ -94,7 +95,7 @@ class matchSkillsEmbeds(views.APIView):
 
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
-
+    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
@@ -134,7 +135,8 @@ class updateContent(views.APIView):
         k = int(request.data['k'])
 
         start = time.perf_counter()
-        articles_uuid = list(Content.objects.all().order_by('updated_on')[:k].values_list('uuid', flat=True))
+        articles_uuid = list(Content.objects.filter(deleted=False).order_by('updated_on')[:k].values_list('uuid', flat=True))
+        # articles_uuid = list(Content.objects.filter(thumbnail_alternative_url=None).values_list('uuid', flat=True))
         logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
         logger.info(f'Updating data for {len(articles_uuid)} articles')
 
@@ -178,6 +180,7 @@ class queryIndex(views.APIView):
 
 
 class modelAutocomplete(views.APIView):
+    @silk_profile(name=SILKY_DEBUG_STR+'Model autocomplete')
 
     def get(self, request):
         try:
@@ -203,13 +206,14 @@ class modelAutocomplete(views.APIView):
         results = search_fuzzy_cache(model, query, k, similarity_minimum)
         start = time.perf_counter()
         results_pk = list(results.values_list('pk', flat=True))
-        logger.info(f'Evaluating results queryset k{len(results_pk)} took {time.perf_counter()-start:.3f}s')
+        logger.debug(f'Evaluating results queryset k{len(results_pk)} took {time.perf_counter()-start:.3f}s')
 
         return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
 
 
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
+    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skill content')
 
     def get(self, request):
         try:
@@ -275,6 +279,7 @@ class adjacentSkillContent(views.APIView):
 
 class searchContent(views.APIView):
     """ search for content based on skills """
+    @silk_profile(name=SILKY_DEBUG_STR+'Search content')
 
     def get(self, request):
         try:
@@ -352,12 +357,13 @@ class searchContent(views.APIView):
             return Response({'content': content_to_return_ranked[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
 
-class recomendContent(views.APIView):
+class recommendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
+    @silk_profile(name=SILKY_DEBUG_STR+'Recommend content')
 
     def get(self, request):
         try:
-            jsonschema.validate(request.data, schema=schemas.recomendContentSchema)
+            jsonschema.validate(request.data, schema=schemas.recommendContentSchema)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
