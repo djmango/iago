@@ -104,12 +104,12 @@ class adjacentSkills(views.APIView):
 
         k = request.data['k'] if 'k' in request.data else 25
         temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else .21
+        query_skills = request.data['skills']
 
         # for each skill in the query, find its closest match in the skills database
-        pool = ThreadPool(processes=MAX_DB_THREADS)
         # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
-        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in request.data['skills']]) if len(x) > 0]
-        pool.close()
+        skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
+        skills = [x[0] for x in skills if len(x) > 0]
 
         adjacent_skills = []
         for skill, skill_name in zip(skills, request.data['skills']):
@@ -230,9 +230,9 @@ class adjacentSkillContent(views.APIView):
         page: int = request.data['page'] if 'page' in request.data else 0
 
         start = time.perf_counter()
-        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+        skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
+        skills = [x[0] for x in skills if len(x) > 0]  # remove none values
         logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
-        skills = [x for x in skills if x is not None]  # remove none values
 
         # okay now we need to get adjacent skills
         adjacent_skills = []
@@ -305,10 +305,9 @@ class searchContent(views.APIView):
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
-            skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+            skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
+            skills = [x[0] for x in skills if len(x) > 0]  # remove none values
             logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
-
-            skills = [x for x in skills if x is not None]  # remove none values
 
             # skills tag search
             if strict and len(skills) > 0:
