@@ -148,7 +148,6 @@ def _dataclass_dict(thing: object) -> dict[str, any]:
     return rv
 
 
-# TODO: make an option for caching n results instead of just top
 def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True):
     """ Gets closest queryset object to the given name
 

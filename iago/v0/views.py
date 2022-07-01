@@ -230,12 +230,8 @@ class adjacentSkillContent(views.APIView):
         page: int = request.data['page'] if 'page' in request.data else 0
 
         start = time.perf_counter()
-
-        pool = ThreadPool(processes=MAX_DB_THREADS)
-        skills = [x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]) if len(x) > 0]
-        pool.close()
-        # skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
-        logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
+        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+        logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
         skills = [x for x in skills if x is not None]  # remove none values
 
         # okay now we need to get adjacent skills
@@ -299,7 +295,6 @@ class searchContent(views.APIView):
         page: int = request.data['page'] if 'page' in request.data else 0
 
         content_to_return = Content.objects.none()
-        skills = []
 
         start = time.perf_counter()
 
@@ -310,10 +305,9 @@ class searchContent(views.APIView):
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
-            pool = ThreadPool(processes=MAX_DB_THREADS)
-            skills.extend([x[0] for x in pool.starmap(search_fuzzy_cache, [(Skill, skill) for skill in query_skills]) if len(x) > 0])
-            pool.close()
-            logger.debug(f'Multithread skill map took {round(time.perf_counter() - start, 3)}s')
+            skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+            logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
+
             skills = [x for x in skills if x is not None]  # remove none values
 
             # skills tag search
