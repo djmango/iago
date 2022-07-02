@@ -58,7 +58,7 @@ def run_silk(request): # WSGI request
         return True
     else:
         return False
-SILKY_PYTHON_PROFILER_FUNC = run_silk # profile only session has recording enabled.
+SILKY_PYTHON_PROFILER_FUNC = run_silk
 
 LOGIN_URL = '/admin/login/'
 

@@ -17,4 +17,5 @@ django-extensions
 ddtrace
 torch
 datasets
-django-silk
+# django-silk
+git+https://github.com/djmango/django-silk.git@ee0812e680c17b66d5458c2338d4969e1aa6761a
