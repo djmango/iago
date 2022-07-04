@@ -108,11 +108,10 @@ class adjacentSkills(views.APIView):
 
         # for each skill in the query, find its closest match in the skills database
         # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
-        skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
-        skills = [x[0] for x in skills if len(x) > 0]
+        skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
 
         adjacent_skills = []
-        for skill, skill_name in zip(skills, request.data['skills']):
+        for skill, skill_name in zip(skills, query_skills):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
@@ -157,6 +156,7 @@ class queryIndex(views.APIView):
         query = str(request.data['query'])
         k = int(request.data['k'])
         index_choice = str(request.data['index'])
+        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else 0
 
         if index_choice == 'topic':
             query_index = index.topic_index
@@ -169,11 +169,11 @@ class queryIndex(views.APIView):
         else:
             return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        results, rankings, query_vector = query_index.query(query, k)
+        results, rankings, query_vector = query_index.query(query, k, temperature)
 
         results_pk = results.values_list('pk', flat=True)
         results_ranked = []
-        for pk, score in rankings:
+        for pk, score in rankings[:k]:
             results_ranked.append(results.filter(pk=pk).values().first())
 
         return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
@@ -202,10 +202,8 @@ class modelAutocomplete(views.APIView):
         else:
             return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # TODO: reimplement reordering
-        results = search_fuzzy_cache(model, query, k, similarity_minimum)
+        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
         start = time.perf_counter()
-        results_pk = list(results.values_list('pk', flat=True))
         logger.debug(f'Evaluating results queryset k{len(results_pk)} took {time.perf_counter()-start:.3f}s')
 
         return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
@@ -230,8 +228,7 @@ class adjacentSkillContent(views.APIView):
         page: int = request.data['page'] if 'page' in request.data else 0
 
         start = time.perf_counter()
-        skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
-        skills = [x[0] for x in skills if len(x) > 0]  # remove none values
+        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
         logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
         # okay now we need to get adjacent skills
@@ -305,7 +302,7 @@ class searchContent(views.APIView):
 
         # otherwise we have skills provided, for each skill in the query, find its closest match in the skills database
         elif query_skills:
-            skills = [search_fuzzy_cache(Skill, x) for x in query_skills]
+            skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
             skills = [x[0] for x in skills if len(x) > 0]  # remove none values
             logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
@@ -362,7 +359,7 @@ class recommendContent(views.APIView):
 
         start = time.perf_counter()
         # first match the free-form job title provided to one embedded in our database
-        job: Job = search_fuzzy_cache(Job, request.data['position'])[0]
+        job: Job = search_fuzzy_cache(Job, request.data['position'])[0].first()
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []
@@ -428,7 +425,7 @@ class jobSkillMatch(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         start = time.perf_counter()
-        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0]
+        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0].first()
         logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
 
         if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones

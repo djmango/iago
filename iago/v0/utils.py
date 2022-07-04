@@ -160,15 +160,15 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
 
     Returns:
         QuerySet: K Closest matched instances, from cache if available
+        List: Pks of closest matched instances ordered by similarity
     """
 
     # check if available in cache first
     start = time.perf_counter()
     cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
-    results = cache.get(cache_key)
-    if use_cached and results and type(results) == QuerySet:  # if so do a simple pk lookup
-        # logger.debug(f'Got cache for {name} in {time.perf_counter()-start:.3f}s')
-        pass
+    cached_results = cache.get(cache_key)
+    if use_cached and cached_results and type(cached_results) == tuple:  # if so do a simple pk lookup
+        results, results_pk = cached_results # unpack tuple
     else:  # if not in cache, find the closest match using trigram and store the result in cache
         # So essentially, querysets are lazy loading
         # so we have to force the execution now
@@ -176,7 +176,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         # otherwise we cache a trigram similarity query which is much slower to execute
         results_pk = list(model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
         results = model.objects.filter(pk__in=results_pk)
-        cache.set(cache_key, results, timeout=60*60*24*2)  # 2 day timeout
+        cache.set(cache_key, (results, results_pk), timeout=60*60*24*2)  # 2 day timeout
         # logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
 
-    return results
+    return results, results_pk

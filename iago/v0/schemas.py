@@ -73,6 +73,11 @@ queryKIndexSchema = {
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
+        },
+        "temperature": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+            "inclusiveMaximum": 100
         }
     },
     "required": ["query", "index"],

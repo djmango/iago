@@ -1,11 +1,11 @@
 import logging
 import time
 from pathlib import Path
-from typing import Iterable
 
 import faiss
 import numpy as np
 from django.core.cache import cache
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from iago.settings import DEBUG
 from sentence_transformers import util
@@ -24,7 +24,7 @@ class VectorIndex():
     def __init__(self, iterable: QuerySet):
         self.iterable = iterable
         if type(iterable) == QuerySet:
-            self.logger = logging.getLogger(f'VectorIndex_{self.iterable.model.__name__}')
+            self.logger = logging.getLogger(f'v0.VectorIndex_{self.iterable.model.__name__}')
         else:
             self.logger = logging.getLogger(f'VectorIndex_Iterable')
         self.d = 768
@@ -60,6 +60,7 @@ class VectorIndex():
 
         Returns:
             results list([int]): List of indexes that are outside the min_distance
+            results_to_remove set([int]): Set of indexes that got removed
         """
 
         start = time.perf_counter()
@@ -81,9 +82,9 @@ class VectorIndex():
 
         # get indices in the global index of the results we want to keep
         cleaned_indices = [int(x) for i, x in enumerate(indices[0]) if i not in results_to_remove]
-        self.logger.debug(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
+        # self.logger.debug(f'Performed min_dist and got {len(cleaned_indices)} vectors in {round(time.perf_counter()-start, 4)}s')
 
-        return cleaned_indices
+        return cleaned_indices, results_to_remove
 
     def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True):
         """ Find closest k matches for a given query or vector using semantic embedding_model
@@ -121,28 +122,33 @@ class VectorIndex():
         # generate a unique deterministic string to cache the results
         if use_cached:
             cache_key = self._generate_cache_key(query_vector, k*p)
-            self.logger.debug(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
+            # self.logger.debug(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
             cached_results = cache.get(cache_key)
 
         if use_cached and cached_results:  # if we got results just depickle them
             values, indices = cached_results
-            self.logger.debug(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
+            # self.logger.debug(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
-            # store the results as a tuple of np.ndarrays to be able to depickle easily later
+            # store the results as a tuple of np.ndarrays, with the row index and its value (ranking) to be able to depickle and order easily later
             if use_cached:
-                cache.set(cache_key, (values, indices), timeout=60*60*24*7)  # 7 day timeout
-            self.logger.debug(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
+                cache.set(cache_key, (values, indices), timeout=60*60*24*2)  # 2 day timeout
+            # self.logger.debug(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
 
         # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
         if min_distance > 0:
-            cleaned_indices = self._min_distance(indices, min_distance)
+            cleaned_indices, results_to_remove = self._min_distance(indices, min_distance)
+            cleaned_values = [] # we need to keep values in the same order as cleaned_indices, so remove the values corresponding to the indices we removed
+            for i, value in enumerate(values.tolist()[0]):
+                if i not in results_to_remove:
+                    cleaned_values.append(value)
         else:
             cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
+            cleaned_values = values.tolist()[0]
         
         # the iterable could be sliced to ensure that we are using a new queryset to filter the results
         results: QuerySet = self.iterable.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])
-        rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, values.tolist()[0])]
+        rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, cleaned_values)]
         return results, rankings, query_vector
 
 topic_index: VectorIndex
@@ -151,6 +157,7 @@ content_index: VectorIndex
 unsplash_photo_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True))
-    skills_index = VectorIndex(Skill.objects.all())
     unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:100000])
+    # index only content that has more than 50 likes
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=50))))
+    skills_index = VectorIndex(Skill.objects.all())
