@@ -342,7 +342,7 @@ class searchContent(views.APIView):
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         if len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+            return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
         else:
             return Response({'content': content_to_return_ranked[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
 
