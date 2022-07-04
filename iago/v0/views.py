@@ -344,7 +344,10 @@ class searchContent(views.APIView):
         if len(content_to_return) == 0:
             return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
         else:
-            return Response({'content': content_to_return_ranked[page*k:(page+1)*k], 'skills': [x.name for x in skills]}, status=status.HTTP_200_OK)
+            resp = {'content': content_to_return_ranked[page*k:(page+1)*k]}
+            if 'skills' in locals():
+                resp['skills'] = [x.name for x in skills if x is not None]
+            return Response(resp, status=status.HTTP_200_OK)
 
 
 class recommendContent(views.APIView):
