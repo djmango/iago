@@ -220,7 +220,7 @@ class adjacentSkillContent(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # required
-        query_skills = request.data['skills'] if 'skills' in request.data else None
+        query_skills = request.data['skills']
         content_type = request.data['type']
         k: int = request.data['k']
         # optional
@@ -228,12 +228,12 @@ class adjacentSkillContent(views.APIView):
         page: int = request.data['page'] if 'page' in request.data else 0
 
         start = time.perf_counter()
-        skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
+        skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
         logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
         # okay now we need to get adjacent skills
         adjacent_skills = []
-        for skill, skill_name in zip(skills, request.data['skills']):
+        for skill, skill_name in zip(skills, query_skills):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=5)
