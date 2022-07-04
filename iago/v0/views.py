@@ -265,9 +265,9 @@ class adjacentSkillContent(views.APIView):
         logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         if len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills]}, status=status.HTTP_204_NO_CONTENT)
+            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills if x is not None]}, status=status.HTTP_204_NO_CONTENT)
         else:
-            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills], 'adjacent_skills': [x['name'] for x in adjacent_skills]}, status=status.HTTP_200_OK)
+            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills if x is not None], 'adjacent_skills': [x['name'] for x in adjacent_skills]}, status=status.HTTP_200_OK)
 
 
 class searchContent(views.APIView):
