@@ -1,5 +1,4 @@
 """ methods and init related to ai and ml models """
-from lib2to3.pgen2 import token
 import logging
 import os
 import time
@@ -7,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from iago.settings import DEBUG
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer, pipeline
 
@@ -82,16 +82,15 @@ SUMMARIZER_CONFIG = {
 # get models
 tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
 
-# use gpu if available
-if torch.cuda.is_available():
-    logger.debug('Summarizer model is using GPU')
-    device = 0
-else:
-    logger.debug('Summarizer model is using CPU')
-    device = -1
+summarizer = None # declare here so we reference it in debug without errors
+if not DEBUG or False: # set to true to enable in debug
+    # use gpu if available
+    if torch.cuda.is_available():
+        logger.debug('Summarizer model is using GPU')
+        device = 0
+    else:
+        logger.debug('Summarizer model is using CPU')
+        device = -1
 
-summarizer = pipeline('summarization', device=device, model=SUMMARIZER_CONFIG['MODEL_NAME'], tokenizer=tokenizer)
-summarizer.model.resize_token_embeddings(len(tokenizer)) # https://github.com/huggingface/transformers/issues/4875
-
-# print(len(tokenizer))
-# print(summarizer.model.config.vocab_size)
+    summarizer = pipeline('summarization', device=device, model=SUMMARIZER_CONFIG['MODEL_NAME'], tokenizer=tokenizer)
+    summarizer.model.resize_token_embeddings(len(tokenizer)) # https://github.com/huggingface/transformers/issues/4875

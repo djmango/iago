@@ -167,7 +167,6 @@ class Content(models.Model):
     content = models.TextField()
     # https://pypi.org/project/readtime/
     content_read_seconds = models.IntegerField()  # seconds = num_words / 265 * 60 + img_weight * num_images
-    provider = models.CharField(max_length=100)
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
     tags = models.JSONField(default=list)
@@ -177,17 +176,21 @@ class Content(models.Model):
     markdown = models.TextField(blank=True, null=True)
     last_response = models.JSONField(default=dict)
     summary = models.JSONField(default=dict)
+    file = models.FileField(upload_to='content/', blank=True, null=True)
+
+    class providers(models.TextChoices):
+        medium = 'medium'
+        hbr = 'hbr'
+        vodafone = 'vodafone'
+
+    provider = models.CharField(max_length=25, choices=providers.choices, default=providers.medium)
 
     class types(models.TextChoices):
         article = 'article'
         video = 'video'
         pdf = 'pdf'
 
-    type = models.CharField(
-        max_length=10,
-        choices=types.choices,
-        default=types.article,
-    )
+    type = models.CharField(max_length=10, choices=types.choices, default=types.article)
 
     # embeddings
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)

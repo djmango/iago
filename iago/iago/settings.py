@@ -49,7 +49,7 @@ os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
 # if we are in debug prepend the call names with that
 SILKY_DEBUG_STR = 'DEBUG ' if DEBUG else ''
 # silky ignores
-SILKY_INTERCEPT_PERCENT = 100 if DEBUG else 50 # %
+SILKY_INTERCEPT_PERCENT = 100 if DEBUG else 33 # %
 SILKY_IGNORE_PATHS = ['/alive']
 NOT_PROFILE_URLS = ['/alive', '/silk', '/admin', '/static']
 def run_silk(request): # WSGI request
@@ -89,7 +89,7 @@ if DEBUG:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    # 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -225,10 +225,19 @@ USE_TZ = True
 
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# File storage
+# https://django-storages.readthedocs.io/en/1.5.0/index.html
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = 'iago-bucket'
+AWS_LOCATION = 'public' # yes all uploads are by default public - this is because for mvp we've decided to not care about security - tbh not my call but whatever

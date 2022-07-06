@@ -1,21 +1,22 @@
-django~=4.0.4
-djangorestframework~=3.13.1
-psycopg2-binary~=2.9.3
-daphne~=3.0.2
-whitenoise~=6.2.0
-jsonschema
-requests~=2.26.0
-twisted[tls,http2]
-scrapy~=2.6.1
 beautifulsoup4~=4.10.0
 boto3~=1.21.28
-faiss-cpu~=1.7.2
-transformers~=4.20.1
-sentence-transformers~=2.1.0
-tldextract~=3.3.0
-django-extensions
-ddtrace
-torch
+daphne~=3.0.2
 datasets
+# ddtrace
+django-extensions
 # django-silk
+django-storages
+django~=4.0.4
+djangorestframework~=3.13.1
+faiss-cpu~=1.7.2
+jsonschema
+psycopg2-binary~=2.9.3
+requests
+scrapy~=2.6.1
+sentence-transformers~=2.1.0
+# tldextract~=3.3.0
+torch
+transformers~=4.20.1
+twisted[tls,http2]
+# whitenoise~=6.2.0
 git+https://github.com/djmango/django-silk.git@ee0812e680c17b66d5458c2338d4969e1aa6761a

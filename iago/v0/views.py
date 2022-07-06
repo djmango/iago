@@ -203,8 +203,6 @@ class modelAutocomplete(views.APIView):
             return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
         results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
-        start = time.perf_counter()
-        logger.debug(f'Evaluating results queryset k{len(results_pk)} took {time.perf_counter()-start:.3f}s')
 
         return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
 
@@ -227,23 +225,25 @@ class adjacentSkillContent(views.APIView):
         length = request.data['length'] if 'length' in request.data else None
         page: int = request.data['page'] if 'page' in request.data else 0
 
-        start = time.perf_counter()
+        # start = time.perf_counter()
         skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
-        logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
+        skills = [x for x in skills if x] # remove nones
+        # logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
         # okay now we need to get adjacent skills
+        adjacent_skills_dict = []
         adjacent_skills = []
         for skill, skill_name in zip(skills, query_skills):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=5)
-                skills_ranked = list(zip(*rankings))[0]
+                skills_ranked = list(zip(*rankings))[0] # get the first element of each name, value (rank) pair and make a list
 
-                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
-                skills.append(skill)
+                adjacent_skills_dict.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
+                adjacent_skills.extend(skills_ranked[1:])
 
         # skills tag search
-        content_to_return = Content.objects.filter(skills__in=skills)
+        content_to_return = Content.objects.filter(skills__in=adjacent_skills)
 
         # apply filters to content_to_return queryset
         # type filter
@@ -260,14 +260,12 @@ class adjacentSkillContent(views.APIView):
         content_to_return = content_to_return.distinct('uuid')
 
         # perform the transaction
-        content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'thumbnail_alternative', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
-
-        logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
+        content_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         if len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No matching skills or content titles found', 'skills': [x.name for x in skills if x is not None]}, status=status.HTTP_204_NO_CONTENT)
+            return Response({'status': 'warning', 'response': 'No adjacent skills or related content found', 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_204_NO_CONTENT)
         else:
-            return Response({'content': content_to_return[page*k:(page+1)*k], 'skills': [x.name for x in skills if x is not None], 'adjacent_skills': [x['name'] for x in adjacent_skills]}, status=status.HTTP_200_OK)
+            return Response({'content': content_to_return[page*k:(page+1)*k], 'adjacent_skills': adjacent_skills_dict, 'num_results': len(content_to_return)}, status=status.HTTP_200_OK)
 
 
 class searchContent(views.APIView):
@@ -293,8 +291,6 @@ class searchContent(views.APIView):
 
         content_to_return = Content.objects.none()
 
-        start = time.perf_counter()
-
         # if we have a query then we want to search content titles for it
         if query_string:
             results, rankings, query_vector = index.content_index.query(query_string, k=k*(page+2))  # plus 2 instead of 1 cuz im just gonna get extra results to ensure we have enough to ensure k values after filters
@@ -304,7 +300,6 @@ class searchContent(views.APIView):
         elif query_skills:
             skills = [search_fuzzy_cache(Skill, x)[0] for x in query_skills]
             skills = [x[0] for x in skills if len(x) > 0]  # remove none values
-            logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
             # skills tag search
             if strict and len(skills) > 0:
@@ -327,6 +322,7 @@ class searchContent(views.APIView):
         content_to_return = content_to_return.distinct('uuid')
 
         # perform the transaction
+        # TODO: this needs to be switched to just ids, need e64 to make the changes on the front end
         content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
 
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
@@ -338,8 +334,6 @@ class searchContent(views.APIView):
                     content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
         else:
             content_to_return_ranked = content_to_return
-
-        logger.debug(f'Content search took {round(time.perf_counter() - start, 3)}s')
 
         if len(content_to_return) == 0:
             return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
@@ -360,7 +354,6 @@ class recommendContent(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        start = time.perf_counter()
         # first match the free-form job title provided to one embedded in our database
         job: Job = search_fuzzy_cache(Job, request.data['position'])[0].first()
 
@@ -414,7 +407,6 @@ class recommendContent(views.APIView):
             if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
                 content_ids_to_return_ranked.append(content_id_ranked)
 
-        logger.info(f'Generating recommendations took {round(time.perf_counter() - start, 3)}s')
         return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
@@ -427,20 +419,15 @@ class jobSkillMatch(views.APIView):
         except jsonschema.exceptions.ValidationError as err:
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        start = time.perf_counter()
         job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0].first()
-        logger.info(f'Trigram took {round(time.perf_counter() - start, 3)}s')
 
         if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
             return Response({'skills': []}, status=status.HTTP_200_OK)
         k = request.data['k'] if 'k' in request.data else 7
 
         # search index
-        start = time.perf_counter()
-
         results, rankings, query_vector = index.skills_index.query(job.embedding_all_mpnet_base_v2, k=k)
         skills_ranked = list(zip(*rankings))[0]
-        logger.info(f'Index search took {round(time.perf_counter() - start, 3)}s')
 
         return Response({'jobtitle': str(job.name), 'skills': skills_ranked}, status=status.HTTP_200_OK)
 

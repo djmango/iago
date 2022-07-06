@@ -52,8 +52,8 @@
                     "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AWS_ACCESS_KEY_ID::"
                 },
                 {
-                    "name": "AWS_ACCESS_KEY_SECRET",
-                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AWS_ACCESS_KEY_SECRET::"
+                    "name": "AWS_SECRET_ACCESS_KEY",
+                    "valueFrom": "arn:aws:secretsmanager:eu-central-1:237339178325:secret:iago-secrets-jhdjX6:AWS_SECRET_ACCESS_KEY::"
                 }
             ],
             "dockerSecurityOptions": null,
