@@ -8,7 +8,7 @@ from iago.settings import LOGGING_LEVEL_MODULE
 
 from v0 import ai, index
 from v0.models import Content
-from v0.utils import clean_str
+from v0.utils import clean_str, truncateTextNTokens
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -222,12 +222,7 @@ def updateArticle(article_uuid):
         # summarize if we dont have a summary yet
         if not ai.SUMMARIZER_CONFIG['MODEL_NAME'] in article.summary:
             # reduce to max tokens
-            clean_text = article.content
-            while len(ai.tokenizer(clean_text)['input_ids']) > ai.SUMMARIZER_CONFIG['MAX_TOKENS']:
-                ten_percent = len(clean_text) // 10
-                clean_text = clean_text[:-ten_percent]
-
-            # logger.debug(f"{len(ai.tokenizer(clean_text)['input_ids'])} tokens")
+            clean_text, num_tokens = truncateTextNTokens(article.content)
             article.summary[ai.SUMMARIZER_CONFIG['MODEL_NAME']] = ai.summarizer(clean_text, min_length=ai.SUMMARIZER_CONFIG['MIN_LENGTH'], no_repeat_ngram_size=ai.SUMMARIZER_CONFIG['NO_REPEAT_NGRAM_SIZE'])[0]['summary_text']
 
         article.save()

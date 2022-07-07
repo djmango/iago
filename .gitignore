@@ -166,3 +166,4 @@ iago/scripts/data/
 .envrc
 .tmp/
 .pgsync.yml
+tesseract/

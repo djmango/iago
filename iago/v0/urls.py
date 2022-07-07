@@ -1,10 +1,12 @@
 import logging
 
 from django.urls import path
-from iago.settings import DEBUG
+from iago.settings import DEBUG, LOGGING_LEVEL_MODULE
+
 from v0 import views
 
 logger = logging.getLogger(__name__)
+logger.setLevel(LOGGING_LEVEL_MODULE)
 
 urlpatterns = [
     path('index/query', views.queryIndex.as_view()),
@@ -13,6 +15,7 @@ urlpatterns = [
     path('content/search', views.searchContent.as_view()),
     path('content/recommend', views.recommendContent.as_view()),
     path('content/adjacent_to_skills', views.adjacentSkillContent.as_view()),
+    path('content/upload', views.contentFileUploadView.as_view()),
     path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
     path('skillspace/adjacent', views.adjacentSkills.as_view()),
     path('skillspace/match', views.matchSkills.as_view()),

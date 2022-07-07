@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from silk.profiling.profiler import silk_profile
 from v0 import ai, index, schemas
 from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic
+from v0.pdf import ingestContentPDF
 from v0.serializers import TopicSerializerAll, fileUploadSerializer
 from v0.utils import search_fuzzy_cache, allowedFile
 
@@ -52,22 +54,26 @@ class contentFileUploadView(views.APIView):
         if fileSerializer.is_valid():
             files = request.FILES.getlist('files')
             
-            # if we pass all checks, store document in db and queue up it up for local ocr and processing
+            # if we pass all checks, store content in db and queue up it up for local ocr and processing
             responses = []
             for file in files: # we run each file independently, it would be incorrect to assume all files are the same type
                 if not allowedFile(file.name): # basic file type check, doesnt check contents. we do that further downstream
                     responses.append({'filename': file.name, 'error': 'file extension is not allowed'})
                     continue
 
-                # save the document filled with basic details to db
-                document = GenericDocument()
-                document.filename = file.name
-                document.save()
-                responses.append({'filename': document.filename, 'id': document.id}) #TODO status json
+                # save the content filled with basic details to db
+                content = Content()
+                content.title = file.name
+                content.author = 'iago_vodafone'
+                content.file = file
+                content.url = content.file.url
+                content.type = Content.types.pdf
+                content.provider = Content.providers.vodafone
+                content.save()
+                responses.append({'filename': content.title, 'id': content.uuid})
 
-                # send to next step, local document classification
-                filebytes = io.BytesIO(file.read())
-                threading.Thread(target=classifyDocument, name=f'classifyDocument_{document.filename}', args=[document, filebytes]).start()
+                # send to next step, full ingestion
+                threading.Thread(target=ingestContentPDF, name=f'processContentFile_{content.title}', args=[content]).start()
 
             if all('error' in x for x in responses):
                 return Response(responses, status=status.HTTP_400_BAD_REQUEST)

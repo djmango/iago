@@ -12,6 +12,8 @@ from django.core.cache import cache
 from django.db import models
 from iago.settings import ALLOWED_FILES, LOGGING_LEVEL_MODULE
 
+from v0 import ai
+
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
 
@@ -66,6 +68,25 @@ def allowedFile(filename):
     """ Checks if the file is allowed to be processed """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_FILES
 
+def truncateTextNTokens(text: str, n: int = ai.SUMMARIZER_CONFIG['MAX_TOKENS']):
+    """ Truncates text to n tokens
+
+    Args:
+        text (str): Text to truncate
+        n (int): Number of tokens to truncate to
+
+    Returns:
+        str: Truncated text
+        int: Number of tokens
+    """
+    while len(ai.tokenizer(text)['input_ids']) > n:
+        ten_percent = len(text) // 10
+        text = text[:-ten_percent]
+    return text, len(ai.tokenizer(text)['input_ids'])
+
+def mediumReadtime(text: str) -> int:
+    """ Calculates the readtime of a text in seconds """
+    return round(words_in(text) / 265 * 60)
 
 #  -- Deterministic Hashing --
 

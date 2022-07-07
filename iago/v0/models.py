@@ -4,8 +4,10 @@ import uuid
 import numpy as np
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from iago.settings import LOGGING_LEVEL_MODULE
 
 logger = logging.getLogger(__name__)
+logger.setLevel(LOGGING_LEVEL_MODULE)
 
 # -- StringEmbedding and children --
 
@@ -164,9 +166,9 @@ class Content(models.Model):
     thumbnail = models.URLField(blank=True, null=True)
     thumbnail_alternative = models.ForeignKey(UnsplashPhoto, on_delete=models.SET_NULL, blank=True, null=True)
     thumbnail_alternative_url = models.URLField(blank=True, null=True)  # this is just to make it easier for the main api, since it only has access to a non-relational mirror of the database
-    content = models.TextField()
+    content = models.TextField(blank=True, null=True)
     # https://pypi.org/project/readtime/
-    content_read_seconds = models.IntegerField()  # seconds = num_words / 265 * 60 + img_weight * num_images
+    content_read_seconds = models.IntegerField(blank=True, null=True)  # seconds = num_words / 265 * 60 + img_weight * num_images
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
     tags = models.JSONField(default=list)
@@ -189,8 +191,9 @@ class Content(models.Model):
         article = 'article'
         video = 'video'
         pdf = 'pdf'
+        invalid_file = 'invalid_file'
 
-    type = models.CharField(max_length=10, choices=types.choices, default=types.article)
+    type = models.CharField(max_length=25, choices=types.choices, default=types.article)
 
     # embeddings
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)

@@ -33,10 +33,11 @@ class Model():
         self.model.max_seq_length = self.max_seq_length
 
     def encode(self, strings: list[str], use_cache=True, show_progress_bar=False):
-        """ gets embeds from strings from cache if availablbe, else embeds strings and saves to cache and returns"""
+        """ gets embeds from strings from cache if availablbe, else embeds strings and saves to cache and returns """
         start = time.perf_counter()
 
         # first get what we can from cache and build a list of ones we still need to embed
+        cache = []
         if use_cache:
             strings = [s.lower() for s in strings]
             cache = list(GenericStringEmbedding.objects.filter(name__in=strings))
@@ -52,8 +53,9 @@ class Model():
             new_embeds = self.model.encode(uncached_strings, show_progress_bar=show_progress_bar)
             for i, string in enumerate(uncached_strings):
                 new_cache.append(GenericStringEmbedding().create(string, new_embeds[i]))
-
-            GenericStringEmbedding.objects.bulk_create(new_cache)
+            
+            if use_cache:
+                GenericStringEmbedding.objects.bulk_create(new_cache)
             logger.info(f'Finished embedding and saved to cache in {time.perf_counter()-start:.3f}s')
 
         # finally, join the cached and new, order by original param, and return
@@ -61,7 +63,7 @@ class Model():
         joined_strings = [x.name for x in joined]
         results = []
         for string in strings:
-            i = joined_strings.index(string)
+            i = joined_strings.index(string.lower())
             results.append(joined[i].embedding_all_mpnet_base_v2)
 
         return np.asarray(results)
@@ -83,7 +85,7 @@ SUMMARIZER_CONFIG = {
 tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
 
 summarizer = None # declare here so we reference it in debug without errors
-if not DEBUG or False: # set to true to enable in debug
+if not DEBUG or True: # set to true to enable in debug
     # use gpu if available
     if torch.cuda.is_available():
         logger.debug('Summarizer model is using GPU')
