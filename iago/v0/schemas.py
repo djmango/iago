@@ -280,7 +280,7 @@ recommendContentSchema = {
             "type": "string",
             "description": "A free-form job position.",
         },
-        "lastconsumedcontent": {
+        "lastconsumedcontent": { # TODO: minimum 1 item here, right now empty lists are valid
             "type": "array",
             "items": {
                 "type": "string",

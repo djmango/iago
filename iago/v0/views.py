@@ -451,6 +451,12 @@ class recommendContent(views.APIView):
             if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
                 content_ids_to_return_ranked.append(content_id_ranked)
 
+
+        # NOTE hijacking this to demo vodafone content
+        vodafone_results, vodafone_rankings, query_vector = index.vodafone_index.query(recomendation_center, k=1)
+        vodafone_content_id = vodafone_rankings[0][0]
+        content_ids_to_return_ranked.insert(0, vodafone_content_id)
+
         return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 

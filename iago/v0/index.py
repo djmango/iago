@@ -155,10 +155,11 @@ topic_index: VectorIndex
 skills_index: VectorIndex
 content_index: VectorIndex
 unsplash_photo_index: VectorIndex
+vodafone_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     # index only content that has more than 50 likes
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
+    skills_index = VectorIndex(Skill.objects.all())
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=50))))
     vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))
-unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:10000])
-skills_index = VectorIndex(Skill.objects.all())
