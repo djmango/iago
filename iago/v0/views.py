@@ -8,16 +8,17 @@ from multiprocessing.pool import ThreadPool
 import jsonschema
 import numpy as np
 from django.db.models import Q
-from iago.settings import LOGGING_LEVEL_MODULE, MAX_DB_THREADS, SILKY_DEBUG_STR
+from iago.settings import LOGGING_LEVEL_MODULE
 from rest_framework import status, views
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic
-from v0.serializers import TopicSerializerAll
-from v0.utils import search_fuzzy_cache
+from v0.serializers import TopicSerializerAll, fileUploadSerializer
+from v0.utils import search_fuzzy_cache, allowedFile
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -37,6 +38,43 @@ class transform(views.APIView):
         embeds = ai.embedding_model.encode(request.data['texts'])
 
         return Response({'vectors': embeds}, status=status.HTTP_200_OK)
+
+
+# content file upload - vodafone rn
+
+class contentFileUploadView(views.APIView):
+    """ file upload and full processing, however only pdf format, supports multiple file uploads """
+
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        fileSerializer = fileUploadSerializer(data=request.data)
+        if fileSerializer.is_valid():
+            files = request.FILES.getlist('files')
+            
+            # if we pass all checks, store document in db and queue up it up for local ocr and processing
+            responses = []
+            for file in files: # we run each file independently, it would be incorrect to assume all files are the same type
+                if not allowedFile(file.name): # basic file type check, doesnt check contents. we do that further downstream
+                    responses.append({'filename': file.name, 'error': 'file extension is not allowed'})
+                    continue
+
+                # save the document filled with basic details to db
+                document = GenericDocument()
+                document.filename = file.name
+                document.save()
+                responses.append({'filename': document.filename, 'id': document.id}) #TODO status json
+
+                # send to next step, local document classification
+                filebytes = io.BytesIO(file.read())
+                threading.Thread(target=classifyDocument, name=f'classifyDocument_{document.filename}', args=[document, filebytes]).start()
+
+            if all('error' in x for x in responses):
+                return Response(responses, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(responses, status=status.HTTP_201_CREATED)
+        else:
+            return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class matchSkills(views.APIView):
@@ -95,7 +133,7 @@ class matchSkillsEmbeds(views.APIView):
 
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
-    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skills')
+    @silk_profile(name='Adjacent skills')
     def get(self, request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
@@ -180,7 +218,7 @@ class queryIndex(views.APIView):
 
 
 class modelAutocomplete(views.APIView):
-    @silk_profile(name=SILKY_DEBUG_STR+'Model autocomplete')
+    @silk_profile(name='Model autocomplete')
 
     def get(self, request):
         try:
@@ -209,7 +247,7 @@ class modelAutocomplete(views.APIView):
 
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
-    @silk_profile(name=SILKY_DEBUG_STR+'Adjacent skill content')
+    @silk_profile(name='Adjacent skill content')
 
     def get(self, request):
         try:
@@ -270,7 +308,7 @@ class adjacentSkillContent(views.APIView):
 
 class searchContent(views.APIView):
     """ search for content based on skills """
-    @silk_profile(name=SILKY_DEBUG_STR+'Search content')
+    @silk_profile(name='Search content')
 
     def get(self, request):
         try:
@@ -346,7 +384,7 @@ class searchContent(views.APIView):
 
 class recommendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
-    @silk_profile(name=SILKY_DEBUG_STR+'Recommend content')
+    @silk_profile(name='Recommend content')
 
     def get(self, request):
         try:

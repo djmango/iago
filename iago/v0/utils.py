@@ -10,8 +10,7 @@ from collections.abc import Collection
 from django.contrib.postgres.search import TrigramSimilarity
 from django.core.cache import cache
 from django.db import models
-from django.db.models.query import QuerySet
-from iago.settings import LOGGING_LEVEL_MODULE
+from iago.settings import ALLOWED_FILES, LOGGING_LEVEL_MODULE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -61,6 +60,12 @@ def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def allowedFile(filename):
+    """ Checks if the file is allowed to be processed """
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_FILES
+
 
 #  -- Deterministic Hashing --
 

@@ -30,11 +30,9 @@ else:
     print('DJANGO SETTINGS IN PRODUCTION')
 
 LOGGING_LEVEL_MODULE = logging.DEBUG if DEBUG else logging.INFO
-MAX_DB_THREADS = 16
-
+ALLOWED_FILES = ['pdf']
 
 # silk profiling
-# SILKY_PYTHON_PROFILER = True
 SILKY_PYTHON_PROFILER_BINARY = True
 SILKY_AUTHENTICATION = True  # User must login
 SILKY_AUTHORISATION = True  # User must have permissions
@@ -46,18 +44,10 @@ SILKY_ANALYZE_QUERIES = True
 SILKY_EXPLAIN_FLAGS = {'format':'JSON', 'costs': True}
 SILKY_PYTHON_PROFILER_RESULT_PATH = BASE_DIR/'.tmp/'
 os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
-# if we are in debug prepend the call names with that
-SILKY_DEBUG_STR = 'DEBUG ' if DEBUG else ''
 # silky ignores
-SILKY_INTERCEPT_PERCENT = 100 if DEBUG else 33 # %
 SILKY_IGNORE_PATHS = ['/alive']
-NOT_PROFILE_URLS = ['/alive', '/silk', '/admin', '/static']
 def run_silk(request): # WSGI request
-    # always log in debug, and for prod log all that under the above list
-    if DEBUG or not any(x in request.path_info for x in NOT_PROFILE_URLS):
-        return True
-    else:
-        return False
+    return request.headers.get('enable-profiler', False) # if header is set, enable profiler
 SILKY_PYTHON_PROFILER_FUNC = run_silk
 
 LOGIN_URL = '/admin/login/'
