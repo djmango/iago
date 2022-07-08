@@ -441,6 +441,11 @@ class recommendContent(views.APIView):
             except Content.DoesNotExist:
                 return Response({'status': 'error', 'response': f'Content with id {content_id} does not exist or has been deleted'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # just for debugging purposes, force if we have an empty list
+        if len(content_history) == 0:
+            content_history = [Content.objects.get(uuid="7be2638d-4baf-4089-b300-cf4c34c6a203")]
+            logger.warning('Empty content history, forcing content_history to 7be2638d-4baf-4089-b300-cf4c34c6a203')
+
         # now get the center of the content history embeddings
         content_history_vectors = np.array([x.embedding_all_mpnet_base_v2 for x in content_history]).astype(np.float32)
         content_history_center = np.average(content_history_vectors, axis=0)
