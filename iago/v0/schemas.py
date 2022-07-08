@@ -59,6 +59,18 @@ queryKSchema = {
     "required": ["query"],
 }
 
+indexSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "index": {
+            "type": "string",
+            "enum": ["topic", "skill", "content", "unsplash", "vodafone"]
+        }
+    },
+    "required": ["index"],
+}
+
 queryKIndexSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -68,7 +80,7 @@ queryKIndexSchema = {
         },
         "index": {
             "type": "string",
-            "enum": ["topic", "skill", "content", "unsplash"]
+            "enum": ["topic", "skill", "content", "unsplash", "vodafone"]
         },
         "k": {
             "type": "integer",
@@ -280,7 +292,7 @@ recommendContentSchema = {
             "type": "string",
             "description": "A free-form job position.",
         },
-        "lastconsumedcontent": { # TODO: minimum 1 item here, right now empty lists are valid
+        "lastconsumedcontent": {  # TODO: minimum 1 item here, right now empty lists are valid
             "type": "array",
             "items": {
                 "type": "string",

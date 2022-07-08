@@ -1,13 +1,11 @@
-import io
-import json
 import logging
-import os
 import threading
 import time
 from multiprocessing.pool import ThreadPool
 
 import jsonschema
 import numpy as np
+from django.core.cache import cache
 from django.db.models import Q
 from iago.settings import LOGGING_LEVEL_MODULE
 from rest_framework import status, views
@@ -20,7 +18,7 @@ from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic
 from v0.pdf import ingestContentPDF
 from v0.serializers import TopicSerializerAll, fileUploadSerializer
-from v0.utils import search_fuzzy_cache, allowedFile
+from v0.utils import allowedFile, search_fuzzy_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -188,6 +186,37 @@ class updateContent(views.APIView):
 
         return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
+# index views
+
+class rebuildIndex(views.APIView):
+    """ rebuild the index """
+    
+    def get(self, request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.indexSchema)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        index_choice = str(request.data['index'])
+
+        if index_choice == 'topic':
+            query_index = index.topic_index
+        elif index_choice == 'skill':
+            query_index = index.skills_index
+        elif index_choice == 'content':
+            query_index = index.content_index
+        elif index_choice == 'unsplash':
+            query_index = index.unsplash_photo_index
+        elif index_choice == 'vodafone':
+            query_index = index.vodafone_index
+        else:
+            return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        query_index._generate_index() # it aint smooth, worried about mem-lock but whatever
+
+        return Response({'status': 'success'}, status=status.HTTP_200_OK)
+
+
 
 class queryIndex(views.APIView):
 
@@ -210,6 +239,8 @@ class queryIndex(views.APIView):
             query_index = index.content_index
         elif index_choice == 'unsplash':
             query_index = index.unsplash_photo_index
+        elif index_choice == 'vodafone':
+            query_index = index.vodafone_index
         else:
             return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -480,6 +511,14 @@ class jobSkillMatch(views.APIView):
         skills_ranked = list(zip(*rankings))[0]
 
         return Response({'jobtitle': str(job.name), 'skills': skills_ranked}, status=status.HTTP_200_OK)
+
+# cache views
+
+class clearCache(views.APIView):
+    """ clear the cache """
+    def get(self, request):
+        cache.clear()
+        return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
 # Topic CRUD class views
 

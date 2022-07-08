@@ -145,6 +145,10 @@ class VectorIndex():
         else:
             cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
             cleaned_values = values.tolist()[0]
+
+        # truncate to k results since we might have expanded them if we used min_distance
+        cleaned_indices = cleaned_indices[:k]
+        cleaned_values = cleaned_values[:k]
         
         # the iterable could be sliced to ensure that we are using a new queryset to filter the results
         results: QuerySet = self.iterable.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])

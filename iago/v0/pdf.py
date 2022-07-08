@@ -34,19 +34,19 @@ def ingestContentPDF(content: Content):
     # get text from pages
     content.content = ''
     for page in pages:
-        content.content = content.content + pytesseract.image_to_string(page, lang='eng', config=f'--oem 1 --tessdata-dir {str(BASE_DIR/"tesseract/")}') # we have the lang file locally, we currently use lstm eng fast
+        content.content = content.content + pytesseract.image_to_string(page, lang='eng', config=f'--oem 1 --tessdata-dir {str(BASE_DIR/"tesseract/")}')  # we have the lang file locally, we currently use lstm eng fast
 
     # clear memory
     del pages
 
     # populate the rest of the fields
-    content.content_read_seconds = mediumReadtime(content.content) # NOTE might be messed up because of all the newlines
+    content.content_read_seconds = mediumReadtime(content.content)  # NOTE might be messed up because of all the newlines
     # lol i know that the express api sorts by popularity on medium articles so this is my hack to get to the front of the line
     content.popularity['medium'] = {'totalClapCount': 9999999999}
 
     # ai stuff
     # embed
-    content.embedding_all_mpnet_base_v2 =  list(ai.embedding_model.encode([content.content], use_cache=False)[0])
+    content.embedding_all_mpnet_base_v2 = list(ai.embedding_model.encode([content.content], use_cache=False)[0])
 
     # summarize
     # reduce to max tokens
