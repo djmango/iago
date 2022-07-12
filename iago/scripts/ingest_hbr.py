@@ -50,7 +50,7 @@ print('Generating content objects...')
 for i, row in tqdm(df.iterrows(), total=df.shape[0]):
     content = Content()
 
-    content.title = row['author']
+    content.title = row['article']
     content.author = repr(str(row['author']))[3:]
     content.url = row['article-href']
     content.provider = Content.providers.hbr
@@ -66,20 +66,25 @@ for i, row in tqdm(df.iterrows(), total=df.shape[0]):
 
     # ai stuff
     # embed
-    content.embedding_all_mpnet_base_v2 = list(embeds[i])
+    if len(embeds) > i:
+        content.embedding_all_mpnet_base_v2 = list(embeds[i])
 
-    # summarize
-    # content.summary = summaries[i]
+        # summarize
+        # content.summary = summaries[i]
 
-    # thumbnail
-    img = index.unsplash_photo_index.query(content.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
-    content.thumbnail_alternative = img
-    content.thumbnail_alternative_url = img.photo_image_url
+        # thumbnail
+        img = index.unsplash_photo_index.query(content.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
+        content.thumbnail_alternative = img
+        content.thumbnail_alternative_url = img.photo_image_url
 
-    content.save()
+    contents.append(content)
 
-    # skills
-    skills, rankings, query_vector = index.skills_index.query(content.embedding_all_mpnet_base_v2, k=5, min_distance=.21)
-    content.skills.set(skills)
+Content.objects.bulk_create(contents)
+
+# okay now we have it saved we do relationships
+for content in tqdm(contents):
+    if content.embedding_all_mpnet_base_v2 is not None:
+        skills, rankings, query_vector = index.skills_index.query(content.embedding_all_mpnet_base_v2, k=5, min_distance=.21)
+        content.skills.set(skills)
 
 print(f'Took {time.perf_counter()-start:.3f}s')

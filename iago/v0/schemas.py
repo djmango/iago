@@ -292,10 +292,10 @@ recommendContentSchema = {
             "type": "string",
             "description": "A free-form job position.",
         },
-        "lastconsumedcontent": {  # TODO: minimum 1 item here, right now empty lists are valid
+        "lastconsumedcontent": {
             "type": "array",
             "description": "The content pieces that the user has consumed.",
-            "minItems": 1,
+            # "minItems": 1, i guess we have to keep these valid because i keep getting empty requests - will handle it on iago side, send random recommendation idk
             "items": {
                 "type": "string",
                 "description": "The unique identifier for a content piece.",
