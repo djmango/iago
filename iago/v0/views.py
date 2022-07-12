@@ -464,6 +464,7 @@ class recommendContent(views.APIView):
         # apply filters
         content_type = request.data['type'] if 'type' in request.data else None
         length = request.data['length'] if 'length' in request.data else None
+        provider = request.data['provider'] if 'provider' in request.data else None
         # type filter
         if content_type:
             content_to_return = content_to_return.filter(type__in=content_type)
@@ -471,6 +472,10 @@ class recommendContent(views.APIView):
         # length filter
         if length:
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
+
+        # provider filter
+        if provider:
+            content_to_return = content_to_return.filter(provider__in=provider)
 
         # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
         content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))

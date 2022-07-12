@@ -50,9 +50,10 @@
             "cwd": "${workspaceFolder}/iago/scrapy_app",
             "args": [
                 "crawl",
-                "medium",
-                "-a",
-                "tags=graphic-design"
+                "hbr"
+                // "medium",
+                // "-a",
+                // "tags=graphic-design"
             ],
             "console": "integratedTerminal"
         },

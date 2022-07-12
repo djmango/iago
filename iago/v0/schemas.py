@@ -294,6 +294,8 @@ recommendContentSchema = {
         },
         "lastconsumedcontent": {  # TODO: minimum 1 item here, right now empty lists are valid
             "type": "array",
+            "description": "The content pieces that the user has consumed.",
+            "minItems": 1,
             "items": {
                 "type": "string",
                 "description": "The unique identifier for a content piece.",
@@ -316,6 +318,14 @@ recommendContentSchema = {
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
+            }
+        },
+        "provider": {
+            "type": "array",
+            "description": "The providers to allow in result.",
+            "items": {
+                "type": "string",
+                "enum": vars(Content.providers)["_member_names_"],
             }
         },
         "length": {

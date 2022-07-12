@@ -3,6 +3,7 @@ import datetime
 import hashlib
 import json
 import logging
+import threading
 import time
 import unicodedata
 from collections.abc import Collection
@@ -64,9 +65,38 @@ def chunks(lst, n):
         yield lst[i:i + n]
 
 
+class RepeatedTimer(object):
+    def __init__(self, interval, function, *args, **kwargs):
+        self._timer = None
+        self.interval = interval
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
+        self.is_running = False
+        self.next_call = time.time()
+        self.start()
+
+    def _run(self):
+        self.is_running = False
+        self.start()
+        self.function(*self.args, **self.kwargs)
+
+    def start(self):
+        if not self.is_running:
+            self.next_call += self.interval
+            self._timer = threading.Timer(self.next_call - time.time(), self._run)
+            self._timer.start()
+            self.is_running = True
+
+    def stop(self):
+        self._timer.cancel()
+        self.is_running = False
+
+
 def allowedFile(filename):
     """ Checks if the file is allowed to be processed """
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_FILES
+
 
 def truncateTextNTokens(text: str, n: int = ai.SUMMARIZER_CONFIG['MAX_TOKENS']):
     """ Truncates text to n tokens
@@ -83,6 +113,7 @@ def truncateTextNTokens(text: str, n: int = ai.SUMMARIZER_CONFIG['MAX_TOKENS']):
         ten_percent = len(text) // 10
         text = text[:-ten_percent]
     return text, len(ai.tokenizer(text)['input_ids'])
+
 
 def mediumReadtime(text: str) -> int:
     """ Calculates the readtime of a text in seconds """
@@ -194,7 +225,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
     cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
     cached_results = cache.get(cache_key)
     if use_cached and cached_results and type(cached_results) == tuple:  # if so do a simple pk lookup
-        results, results_pk = cached_results # unpack tuple
+        results, results_pk = cached_results  # unpack tuple
     else:  # if not in cache, find the closest match using trigram and store the result in cache
         # So essentially, querysets are lazy loading
         # so we have to force the execution now

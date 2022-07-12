@@ -171,6 +171,7 @@ class Content(models.Model):
     content_read_seconds = models.IntegerField(blank=True, null=True)  # seconds = num_words / 265 * 60 + img_weight * num_images
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)
+    published_on = models.DateTimeField(blank=True, null=True)
     tags = models.JSONField(default=list)
     skills = models.ManyToManyField(Skill)
     popularity = models.JSONField(default=dict)
