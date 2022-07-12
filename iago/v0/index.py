@@ -86,7 +86,7 @@ class VectorIndex():
 
         return cleaned_indices, results_to_remove
 
-    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True):
+    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True, truncate_results=True):
         """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
@@ -147,8 +147,9 @@ class VectorIndex():
             cleaned_values = values.tolist()[0]
 
         # truncate to k results since we might have expanded them if we used min_distance
-        cleaned_indices = cleaned_indices[:k]
-        cleaned_values = cleaned_values[:k]
+        if truncate_results:
+            cleaned_indices = cleaned_indices[:k]
+            cleaned_values = cleaned_values[:k]
         
         # the iterable could be sliced to ensure that we are using a new queryset to filter the results
         results: QuerySet = self.iterable.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])

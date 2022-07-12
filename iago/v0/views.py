@@ -458,7 +458,7 @@ class recommendContent(views.APIView):
         k: int = request.data['k']
         page: int = request.data['page'] if 'page' in request.data else 0
         temperature = float(request.data['temperature']/100) if 'temperature' in request.data else 0
-        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature)
+        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature, truncate_results=False)
         content_to_return = results
 
         # apply filters
