@@ -101,6 +101,7 @@ textsSchema = {
     "properties": {
         "texts": {
             "type": "array",
+            "uniqueItems": True,
             "items": {
                 "type": "string"
             }
@@ -144,6 +145,7 @@ embedsSchema = {
     "properties": {
         "embeds": {
             "type": "array",
+            "uniqueItems": True,
             "items": {
                 "type": "array"
             }
@@ -163,6 +165,7 @@ searchContentSchema = {
         "skills": {
             "type": "array",
             "description": "The skills to look for in content.",
+            "uniqueItems": True,
             "items": {
                 "type": "string"
             }
@@ -170,6 +173,7 @@ searchContentSchema = {
         "type": {
             "type": "array",
             "description": "The types of content to allow in result.",
+            "uniqueItems": True,
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
@@ -217,6 +221,7 @@ adjacentSkillContentSchema = {
         "skills": {
             "type": "array",
             "description": "The skills to look for in content.",
+            "uniqueItems": True,
             "items": {
                 "type": "string"
             }
@@ -224,6 +229,7 @@ adjacentSkillContentSchema = {
         "type": {
             "type": "array",
             "description": "The types of content to allow in result.",
+            "uniqueItems": True,
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
@@ -261,6 +267,7 @@ adjacentSkillsSchema = {
     "properties": {
         "skills": {
             "type": "array",
+            "uniqueItems": True,
             "items": {
                 "type": "string"
             }
@@ -295,6 +302,7 @@ recommendContentSchema = {
         "lastconsumedcontent": {
             "type": "array",
             "description": "The content pieces that the user has consumed.",
+            "uniqueItems": True,
             # "minItems": 1, i guess we have to keep these valid because i keep getting empty requests - will handle it on iago side, send random recommendation idk
             "items": {
                 "type": "string",
@@ -315,6 +323,7 @@ recommendContentSchema = {
         "type": {
             "type": "array",
             "description": "The types of content to allow in result.",
+            "uniqueItems": True,
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
@@ -353,6 +362,15 @@ recommendContentSchema = {
             "type": "integer",
             "inclusiveMinimum": 0,
             "inclusiveMaximum": 100
+        },
+        "fields": {
+            "type": "array",
+            "description": "The fields to return.",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": [x.name for x in Content._meta.get_fields()],
+            }
         }
     },
     "required": ["position", "lastconsumedcontent", "k"]

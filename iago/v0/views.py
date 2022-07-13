@@ -11,6 +11,7 @@ from iago.settings import LOGGING_LEVEL_MODULE
 from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.request import Request
 from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
@@ -28,7 +29,7 @@ class transform(views.APIView):
     """ transform texts """
     allowed_groups = {}
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.textsSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -47,7 +48,7 @@ class contentFileUploadView(views.APIView):
 
     parser_classes = (MultiPartParser, FormParser)
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args, **kwargs):
         fileSerializer = fileUploadSerializer(data=request.data)
         if fileSerializer.is_valid():
             files = request.FILES.getlist('files')
@@ -84,7 +85,7 @@ class contentFileUploadView(views.APIView):
 class matchSkills(views.APIView):
     """ take texts and return their embedding and related skills """
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.textsSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -114,7 +115,7 @@ class matchSkills(views.APIView):
 class matchSkillsEmbeds(views.APIView):
     """ take embeds return their related skills """
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.embedsSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -138,7 +139,7 @@ class matchSkillsEmbeds(views.APIView):
 class adjacentSkills(views.APIView):
     """ take embeds return their related skills """
     @silk_profile(name='Adjacent skills')
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -167,7 +168,7 @@ class adjacentSkills(views.APIView):
 class updateContent(views.APIView):
     """ update scraped articles with their medium data """
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.kSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -191,7 +192,7 @@ class updateContent(views.APIView):
 class rebuildIndex(views.APIView):
     """ rebuild the index """
     
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.indexSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -220,7 +221,7 @@ class rebuildIndex(views.APIView):
 
 class queryIndex(views.APIView):
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.queryKIndexSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -257,7 +258,7 @@ class queryIndex(views.APIView):
 class modelAutocomplete(views.APIView):
     @silk_profile(name='Model autocomplete')
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -286,7 +287,7 @@ class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Adjacent skill content')
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -347,7 +348,7 @@ class searchContent(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Search content')
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.searchContentSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -423,7 +424,7 @@ class recommendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
     @silk_profile(name='Recommend content')
 
-    def get(self, request):
+    def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.recommendContentSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -451,20 +452,22 @@ class recommendContent(views.APIView):
         content_history_center = np.average(content_history_vectors, axis=0)
 
         # get the weights of job and history and compute the center of the recomendation in the embedding space
-        job_weight, history_weight = request.data['weights'] if 'weights' in request.data else [1, 1]
+        job_weight, history_weight = request.data.get('weights', [1, 1]) # default to equal weights
         recomendation_center = np.average([np.array(job.embedding_all_mpnet_base_v2), content_history_center], axis=0, weights=[job_weight, history_weight])
 
         # now get the closest k content to the recomendation center via our faiss index
         k: int = request.data['k']
-        page: int = request.data['page'] if 'page' in request.data else 0
-        temperature = float(request.data['temperature']/100) if 'temperature' in request.data else 0
-        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+2), min_distance=temperature, truncate_results=False)
+        page: int = request.data.get('page', 0) # default to 0
+        temperature = float(request.data.get('temperature', 0)/100) # default to 0
+        if temperature == 0: # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
+            k = k*10
+        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+1), min_distance=temperature, truncate_results=False)
         content_to_return = results
 
         # apply filters
-        content_type = request.data['type'] if 'type' in request.data else None
-        length = request.data['length'] if 'length' in request.data else None
-        provider = request.data['provider'] if 'provider' in request.data else None
+        content_type = request.data.get('type')
+        length = request.data.get('length')
+        provider = request.data.get('provider')
         # type filter
         if content_type:
             content_to_return = content_to_return.filter(type__in=content_type)
@@ -498,13 +501,20 @@ class recommendContent(views.APIView):
         vodafone_content_id = vodafone_rankings[0][0]
         content_ids_to_return_ranked.insert(0, vodafone_content_id)
 
-        return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
+        # determine if we want to return fields or just uuid
+        fields = request.data.get('fields')
+        if fields and not all(f == 'uuid' for f in fields):
+            content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked[page*k:(page+1)*k])
+            content_to_return = content_to_return.values(*fields)
+            return Response({'content_recommendations': content_to_return, 'matched_job': job.name}, status=status.HTTP_200_OK)
+        else:
+            return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):
     """ take a job title string and return matching skills """
 
-    def post(self, request):
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.jobSkillMatchSchema)
         except jsonschema.exceptions.ValidationError as err:
@@ -526,7 +536,7 @@ class jobSkillMatch(views.APIView):
 
 class clearCache(views.APIView):
     """ clear the cache """
-    def get(self, request):
+    def delete(self, request: Request):
         cache.clear()
         return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
@@ -534,21 +544,21 @@ class clearCache(views.APIView):
 
 
 class topicList(views.APIView):
-    def get(self, request):
+    def get(self, request: Request):
         return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
 
 
 class topic(views.APIView):
     """ CRUD for specified topic """
 
-    def get(self, request, name: str):
+    def get(self, request: Request, name: str):
         name = name.lower()
         if Topic.objects.filter(name=name).count() > 0:
             return Response(TopicSerializerAll(Topic.objects.get(name=name)).data, status=status.HTTP_200_OK)
         else:
             return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    def post(self, request, name: str):
+    def post(self, request: Request, name: str):
         name = name.lower()
         if Topic.objects.filter(name=name).count() > 0:
             return Response({'status': 'exists', 'response': f'topic {name} already exists'}, status=status.HTTP_302_FOUND)
@@ -559,7 +569,7 @@ class topic(views.APIView):
             threading.Thread(target=index.topic_index.generate_index).start()
             return Response({'status': 'success', 'response': f'{name} created'}, status=status.HTTP_201_CREATED)
 
-    def delete(self, request, name: str):
+    def delete(self, request: Request, name: str):
         name = name.lower()
         if Topic.objects.filter(name=name).count() > 0:
             Topic.objects.get(name=name).delete()
@@ -570,5 +580,5 @@ class topic(views.APIView):
 
 
 class alive(views.APIView):
-    def get(self, request):
+    def get(self, request: Request):
         return Response('alive', status=status.HTTP_200_OK)

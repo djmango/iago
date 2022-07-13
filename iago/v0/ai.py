@@ -85,7 +85,7 @@ SUMMARIZER_CONFIG = {
 tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
 
 summarizer = None # declare here so we reference it in debug without errors
-if not DEBUG or True: # set to true to enable in debug
+if not DEBUG or False: # set to true to enable in debug
     # use gpu if available
     if torch.cuda.is_available():
         logger.debug('Summarizer model is using GPU')

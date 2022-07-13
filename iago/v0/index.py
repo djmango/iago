@@ -46,10 +46,10 @@ class VectorIndex():
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
 
-    def _generate_cache_key(self, vector: np.ndarray, k: int):
+    def _generate_cache_key(self, vector: np.ndarray, k: int, min_distance: float):
         """ Generate a unique string to given a vector and k """
         hashed_vector = get_hash(vector.tolist())
-        return f'queryvector_{hashed_vector.hex()}_k{k}'
+        return f'queryvector_{hashed_vector.hex()}_k{str(k)}_md{str(min_distance)}'
 
     def _min_distance(self, indices: list[int], min_distance: float):
         """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
@@ -60,7 +60,7 @@ class VectorIndex():
 
         Returns:
             results list([int]): List of indexes that are outside the min_distance
-            results_to_remove set([int]): Set of indexes that got removed
+            results_to_remove set([int]): Set of index values (i) that got removed from incides
         """
 
         start = time.perf_counter()
@@ -94,6 +94,7 @@ class VectorIndex():
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
             use_cached (bool, optional): Whether to use the cached vectors or not. Defaults to True.
+            truncate_results (bool, optional): Whether to truncate the results to the top k. Defaults to True.
 
         Returns:
             results: (QuerySet): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
@@ -121,30 +122,26 @@ class VectorIndex():
 
         # generate a unique deterministic string to cache the results
         if use_cached:
-            cache_key = self._generate_cache_key(query_vector, k*p)
+            cache_key = self._generate_cache_key(query_vector, k*p, min_distance)
             # self.logger.debug(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
             cached_results = cache.get(cache_key)
 
         if use_cached and cached_results:  # if we got results just depickle them
-            values, indices = cached_results
-            # self.logger.debug(f'Got cache for {cache_key} in {time.perf_counter()-start:.3f}s')
+            cleaned_values, cleaned_indices = cached_results
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
+            # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
+            if min_distance > 0:
+                # so for clarity, cleaned indices is a list of i values corresponding to our parent iterable, our queryset, where results_to_remove is a list of i values that got removed from indices, which can be confusing because there are two lists of indices, one being the parent of the other essentially
+                cleaned_indices, results_to_remove = self._min_distance(indices, min_distance)
+                # we need to keep values in the same order as cleaned_indices, so remove the values corresponding to the indices we removed
+                cleaned_values = [value for i, value in enumerate(values.tolist()[0]) if i not in results_to_remove]
+            else:
+                cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
+                cleaned_values = values.tolist()[0]
             # store the results as a tuple of np.ndarrays, with the row index and its value (ranking) to be able to depickle and order easily later
             if use_cached:
-                cache.set(cache_key, (values, indices), timeout=60*60*24*2)  # 2 day timeout
-            # self.logger.debug(f'Searched index and got {len(values[0])}/{k*p} vectors in {round(time.perf_counter()-start, 4)}s')
-
-        # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
-        if min_distance > 0:
-            cleaned_indices, results_to_remove = self._min_distance(indices, min_distance)
-            cleaned_values = [] # we need to keep values in the same order as cleaned_indices, so remove the values corresponding to the indices we removed
-            for i, value in enumerate(values.tolist()[0]):
-                if i not in results_to_remove:
-                    cleaned_values.append(value)
-        else:
-            cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
-            cleaned_values = values.tolist()[0]
+                cache.set(cache_key, (cleaned_values, cleaned_indices), timeout=60*60*24*2)  # 2 day timeout
 
         # truncate to k results since we might have expanded them if we used min_distance
         if truncate_results:
@@ -163,8 +160,8 @@ unsplash_photo_index: VectorIndex
 vodafone_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
-    # index only content that has more than 50 likes
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=50))))
-    vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))
-unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
-skills_index = VectorIndex(Skill.objects.all())
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
+    skills_index = VectorIndex(Skill.objects.all())
+# index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
+content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))))
+vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))

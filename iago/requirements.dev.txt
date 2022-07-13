@@ -1,0 +1,8 @@
+beautifulsoup4~=4.10.0
+datasets
+openpyxl
+python_hide_my_name
+requests-oauthlib
+scrapy~=2.6.1
+scrapy-user-agents
+scrapy-rotating-proxies
