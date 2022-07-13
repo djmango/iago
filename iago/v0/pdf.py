@@ -62,5 +62,8 @@ def ingestContentPDF(content: Content):
     skills, rankings, query_vector = index.skills_index.query(content.embedding_all_mpnet_base_v2, k=5, min_distance=.21)
     content.skills.set(skills)
 
+    # tags are just the skills, leftover from the old medium stuff
+    content.tags = list(skills.values_list('name', flat=True))
+
     content.save()
     return content

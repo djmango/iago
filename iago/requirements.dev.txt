@@ -3,6 +3,7 @@ datasets
 openpyxl
 python_hide_my_name
 requests-oauthlib
-scrapy~=2.6.1
-scrapy-user-agents
 scrapy-rotating-proxies
+scrapy-user-agents
+scrapy~=2.6.1
+tqdm
