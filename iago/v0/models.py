@@ -158,35 +158,11 @@ class UnsplashPhoto(models.Model):
 # -- The core content --
 
 class Content(models.Model):
-    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    url = models.URLField(max_length=800, unique=True)
-    author = models.TextField()
-    title = models.TextField()
-    subtitle = models.TextField(blank=True, null=True)
-    thumbnail = models.URLField(blank=True, null=True)
-    thumbnail_alternative = models.ForeignKey(UnsplashPhoto, on_delete=models.SET_NULL, blank=True, null=True)
-    thumbnail_alternative_url = models.URLField(blank=True, null=True)  # this is just to make it easier for the main api, since it only has access to a non-relational mirror of the database
-    content = models.TextField(blank=True, null=True)
-    # https://pypi.org/project/readtime/
-    content_read_seconds = models.IntegerField(blank=True, null=True)  # seconds = num_words / 265 * 60 + img_weight * num_images
-    created_on = models.DateTimeField(auto_now_add=True)
-    updated_on = models.DateTimeField(auto_now=True)
-    published_on = models.DateTimeField(blank=True, null=True)
-    tags = models.JSONField(default=list)
-    skills = models.ManyToManyField(Skill)
-    popularity = models.JSONField(default=dict)
-    deleted = models.BooleanField(default=False)
-    markdown = models.TextField(blank=True, null=True)
-    last_response = models.JSONField(default=dict)
-    summary = models.JSONField(default=dict)
-    file = models.FileField(upload_to='content/', blank=True, null=True)
-
+    """ Model class for all content types """
     class providers(models.TextChoices):
         medium = 'medium'
         hbr = 'hbr'
         vodafone = 'vodafone'
-
-    provider = models.CharField(max_length=25, choices=providers.choices, default=providers.medium)
 
     class types(models.TextChoices):
         article = 'article'
@@ -194,7 +170,35 @@ class Content(models.Model):
         pdf = 'pdf'
         invalid_file = 'invalid_file'
 
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    url = models.URLField(max_length=800, unique=True)
+    title = models.TextField()
+
+    author = models.TextField(blank=True, null=True)
+    subtitle = models.TextField(blank=True, null=True)
+
+    thumbnail = models.URLField(blank=True, null=True)
+    thumbnail_original = models.URLField(blank=True, null=True)
+    thumbnail_alternative = models.ForeignKey(UnsplashPhoto, on_delete=models.SET_NULL, blank=True, null=True)
+    
+    content = models.TextField(blank=True, null=True)
+    content_read_seconds = models.IntegerField(blank=True, null=True)  # https://pypi.org/project/readtime/ seconds = num_words / 265 * 60 + img_weight * num_images
+    markdown = models.TextField(blank=True, null=True)
+    popularity = models.JSONField(default=dict)
+    summary = models.JSONField(default=dict)
+    provider = models.CharField(max_length=25, choices=providers.choices, default=providers.medium)
     type = models.CharField(max_length=25, choices=types.choices, default=types.article)
+    
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+    published_on = models.DateTimeField(blank=True, null=True)
+    
+    tags = models.JSONField(default=list)
+    skills = models.ManyToManyField(Skill)
+    
+    deleted = models.BooleanField(default=False)
+    last_response = models.JSONField(default=dict)
+    file = models.FileField(upload_to='content/', blank=True, null=True)
 
     # embeddings
     embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)

@@ -217,7 +217,6 @@ def updateArticle(article_uuid):
         if hasattr(index, 'unsplash_photo_index') and (article.thumbnail_alternative is None or article.thumbnail_alternative_url is None):
             img = index.unsplash_photo_index.query(article.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
             article.thumbnail_alternative = img
-            article.thumbnail_alternative_url = img.photo_image_url
 
         # summarize if we dont have a summary yet
         if not ai.SUMMARIZER_CONFIG['MODEL_NAME'] in article.summary:

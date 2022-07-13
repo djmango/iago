@@ -56,7 +56,6 @@ def ingestContentPDF(content: Content):
     # thumbnail
     img = index.unsplash_photo_index.query(content.embedding_all_mpnet_base_v2, k=1, use_cached=False)[0][0]
     content.thumbnail_alternative = img
-    content.thumbnail_alternative_url = img.photo_image_url
 
     # skills
     skills, rankings, query_vector = index.skills_index.query(content.embedding_all_mpnet_base_v2, k=5, min_distance=.21)

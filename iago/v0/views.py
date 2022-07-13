@@ -178,7 +178,6 @@ class updateContent(views.APIView):
 
         start = time.perf_counter()
         articles_uuid = list(Content.objects.filter(deleted=False).order_by('updated_on')[:k].values_list('uuid', flat=True))
-        # articles_uuid = list(Content.objects.filter(thumbnail_alternative_url=None).values_list('uuid', flat=True))
         logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
         logger.info(f'Updating data for {len(articles_uuid)} articles')
 
