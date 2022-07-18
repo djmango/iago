@@ -430,7 +430,12 @@ class recommendContent(views.APIView):
             return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # first match the free-form job title provided to one embedded in our database
-        job: Job = search_fuzzy_cache(Job, request.data['position'])[0].first()
+        position: str = request.data['position']
+        start = time.perf_counter()
+        job: Job = search_fuzzy_cache(Job, position, force_result=True)[0].first()
+        logger.debug(f'Job search time: {time.perf_counter() - start}')
+        # if job is None:
+        #     return Response({'status': 'error', 'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []

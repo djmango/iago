@@ -12,7 +12,7 @@ from sentence_transformers import util
 
 from v0.ai import embedding_model
 from v0.models import Content, Skill, Topic, UnsplashPhoto
-from v0.utils import get_hash
+from v0.utils import generate_cache_key, get_hash
 
 HERE = Path(__file__).parent
 logger = logging.getLogger(__name__)
@@ -45,11 +45,6 @@ class VectorIndex():
 
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
         self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
-
-    def _generate_cache_key(self, vector: np.ndarray, k: int, min_distance: float):
-        """ Generate a unique string to given a vector and k """
-        hashed_vector = get_hash(vector.tolist())
-        return f'queryvector_{hashed_vector.hex()}_k{str(k)}_md{str(min_distance)}'
 
     def _min_distance(self, indices: list[int], min_distance: float):
         """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
@@ -122,8 +117,7 @@ class VectorIndex():
 
         # generate a unique deterministic string to cache the results
         if use_cached:
-            cache_key = self._generate_cache_key(query_vector, k*p, min_distance)
-            # self.logger.debug(f'Hashed vector in {round(time.perf_counter()-start, 4)}s')
+            cache_key = generate_cache_key(query_vector.tolist(), k*p, min_distance, version=1)
             cached_results = cache.get(cache_key)
 
         if use_cached and cached_results:  # if we got results just depickle them

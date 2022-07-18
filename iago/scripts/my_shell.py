@@ -13,17 +13,22 @@ HERE = Path(__file__).parent
 
 # to_migrate = Content.objects.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))).values_list('uuid', 'thumbnail')
 # to_migrate = Content.objects.filter(thumbnail_original__isnull=True).values_list('uuid', 'thumbnail')
-to_migrate = Content.objects.all().values_list('uuid', 'thumbnail', 'provider', 'skills', 'thumbnail_alternative')
+# to_migrate = Content.objects.all()
 
-for uuid, thumbnail, provider, skills, thumbnail_alternative in tqdm(to_migrate, total=to_migrate.count()):
-    skills_list = [x.name for x in skills.values_list('name', flat=True)]
-    if thumbnail:
-        if provider == 'medium':
-            Content.objects.filter(uuid=uuid).update(thumbnail_original=thumbnail, thumbnail=thumbnail_alternative.photo_image_url, tags=skills_list)
-        elif provider == 'hbr':
-            Content.objects.filter(uuid=uuid).update(thumbnail_original=thumbnail, tags=skills_list)
-    else:
-        Content.objects.filter(uuid=uuid).update(tags=skills_list)
+# for content in tqdm(to_migrate.iterator(3000), total=to_migrate.count()):
+#     skills_list = list(content.skills.values_list('name', flat=True))
+#     if content.thumbnail:
+#         if content.provider == 'medium':
+#             content.thumbnail_original = content.thumbnail
+#             if content.thumbnail_alternative:
+#                 content.thumbnail = content.thumbnail_alternative.photo_image_url
+#             content.tags = skills_list
+#         elif content.provider == 'hbr':
+#             content.thumbnail_original = content.thumbnail
+#     else:
+#         content.tags = skills_list
+
+#     content.save()
 
 # df = pd.read_excel(HERE/'data'/'hbr'/'hbr_fixed.xlsx')
 # for i, row in tqdm(df.iterrows(), total=df.shape[0]):
@@ -51,12 +56,12 @@ for uuid, thumbnail, provider, skills, thumbnail_alternative in tqdm(to_migrate,
 #     new = new.replace("'", "")
 
 # add plaintext skills as tags for the demo
-# to_tag = Content.objects.filter(provider='hbr')
-# for content in tqdm(to_tag.iterator(1000), total=to_tag.count()):
-#     content.tags = list(content.skills.values_list('name', flat=True))
-#     content.save()
+to_tag = Content.objects.filter(tags=[])
+for content in tqdm(to_tag.iterator(1000), total=to_tag.count()):
+    content.tags = list(content.skills.values_list('name', flat=True))
+    content.save()
 
-#     Content.objects.filter(uuid=uuid).update(author=new)
+    # Content.objects.filter(uuid=uuid).update(author=new)
 
 # fix null embeds
 # from v0.ai import embedding_model
@@ -68,3 +73,5 @@ for uuid, thumbnail, provider, skills, thumbnail_alternative in tqdm(to_migrate,
 
 # for i, uuid in tqdm(enumerate([x[0] for x in to_embed])):
 #     Content.objects.filter(uuid=uuid).update(embedding_all_mpnet_base_v2=list(embeds[i]))
+
+print('done!')

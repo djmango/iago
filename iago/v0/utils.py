@@ -205,7 +205,11 @@ def _dataclass_dict(thing: object) -> dict[str, any]:
     return rv
 
 
-def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True):
+def generate_cache_key(*args, **kwargs):
+    return str(get_hash((args, kwargs)).hex())
+
+
+def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False):
     """ Gets closest queryset object to the given name
 
     Args:
@@ -222,7 +226,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
 
     # check if available in cache first
     start = time.perf_counter()
-    cache_key = f"{str(model._meta).lower()}_{get_hash(name).hex()}_k{k}"
+    cache_key = generate_cache_key(str(model._meta).lower(), name, k, similarity_minimum, version=1) # change version every time you modify this line
     cached_results = cache.get(cache_key)
     if use_cached and cached_results and type(cached_results) == tuple:  # if so do a simple pk lookup
         results, results_pk = cached_results  # unpack tuple
@@ -234,6 +238,8 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         results_pk = list(model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
         results = model.objects.filter(pk__in=results_pk)
         cache.set(cache_key, (results, results_pk), timeout=60*60*24*2)  # 2 day timeout
-        # logger.debug(f'Trigram search and set cache for {name} took {time.perf_counter()-start:.3f}s')
+
+    if len(results_pk) == 0 and force_result: # if we want to force a result, reduce the similarity minimum and call self again
+        return search_fuzzy_cache(model, name, k, similarity_minimum*0.7, use_cached=use_cached, force_result=True)
 
     return results, results_pk
