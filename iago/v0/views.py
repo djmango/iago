@@ -7,7 +7,7 @@ import jsonschema
 import numpy as np
 from django.core.cache import cache
 from django.db.models import Q
-from iago.settings import LOGGING_LEVEL_MODULE
+from iago.settings import DEBUG, LOGGING_LEVEL_MODULE
 from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -18,8 +18,8 @@ from v0 import ai, index, schemas
 from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic
 from v0.pdf import ingestContentPDF
-from v0.serializers import TopicSerializerAll, fileUploadSerializer
-from v0.utils import allowedFile, search_fuzzy_cache
+from v0.serializers import fileUploadSerializer
+from v0.utils import allowedFile, is_valid_uuid, search_fuzzy_cache
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -33,7 +33,7 @@ class transform(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.textsSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # embed
         embeds = ai.embedding_model.encode(request.data['texts'])
@@ -52,11 +52,11 @@ class contentFileUploadView(views.APIView):
         fileSerializer = fileUploadSerializer(data=request.data)
         if fileSerializer.is_valid():
             files = request.FILES.getlist('files')
-            
+
             # if we pass all checks, store content in db and queue up it up for local ocr and processing
             responses = []
-            for file in files: # we run each file independently, it would be incorrect to assume all files are the same type
-                if not allowedFile(file.name): # basic file type check, doesnt check contents. we do that further downstream
+            for file in files:  # we run each file independently, it would be incorrect to assume all files are the same type
+                if not allowedFile(file.name):  # basic file type check, doesnt check contents. we do that further downstream
                     responses.append({'filename': file.name, 'error': 'file extension is not allowed'})
                     continue
 
@@ -89,7 +89,7 @@ class matchSkills(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.textsSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         texts = request.data['texts']
 
@@ -119,7 +119,7 @@ class matchSkillsEmbeds(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.embedsSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         results = []
         # find skills for each text/vector and populate results
@@ -143,7 +143,7 @@ class adjacentSkills(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         k = request.data['k'] if 'k' in request.data else 25
         temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else .21
@@ -172,7 +172,7 @@ class updateContent(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.kSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         k = int(request.data['k'])
 
@@ -184,18 +184,19 @@ class updateContent(views.APIView):
         pool = ThreadPool(processes=4)
         pool.map_async(updateArticle, articles_uuid)
 
-        return Response({'status': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
+        return Response({'response': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
 
 # index views
 
+
 class rebuildIndex(views.APIView):
     """ rebuild the index """
-    
+
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.indexSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         index_choice = str(request.data['index'])
 
@@ -210,12 +211,11 @@ class rebuildIndex(views.APIView):
         elif index_choice == 'vodafone':
             query_index = index.vodafone_index
         else:
-            return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        query_index._generate_index() # it aint smooth, worried about mem-lock but whatever
+        query_index._generate_index()  # it aint smooth, worried about mem-lock but whatever
 
-        return Response({'status': 'success'}, status=status.HTTP_200_OK)
-
+        return Response({'response': 'success'}, status=status.HTTP_200_OK)
 
 
 class queryIndex(views.APIView):
@@ -224,7 +224,7 @@ class queryIndex(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.queryKIndexSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         query = str(request.data['query'])
         k = int(request.data['k'])
@@ -242,7 +242,7 @@ class queryIndex(views.APIView):
         elif index_choice == 'vodafone':
             query_index = index.vodafone_index
         else:
-            return Response({'status': 'error', 'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
         results, rankings, query_vector = query_index.query(query, k, temperature)
 
@@ -251,17 +251,16 @@ class queryIndex(views.APIView):
         for pk, score in rankings[:k]:
             results_ranked.append(results.filter(pk=pk).values().first())
 
-        return Response({'status': 'success', 'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
+        return Response({'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
 
 
 class modelAutocomplete(views.APIView):
     @silk_profile(name='Model autocomplete')
-
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         query = str(request.data['query'])
         model_choice = str(request.data['model'])
@@ -277,22 +276,21 @@ class modelAutocomplete(views.APIView):
         elif model_choice == 'job':
             model = Job
         else:
-            return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
         results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
 
-        return Response({'status': 'success', 'results': results_pk}, status=status.HTTP_200_OK)
+        return Response({'results': results_pk}, status=status.HTTP_200_OK)
 
 
 class adjacentSkillContent(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Adjacent skill content')
-
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # required
         query_skills = request.data['skills']
@@ -304,7 +302,7 @@ class adjacentSkillContent(views.APIView):
 
         # start = time.perf_counter()
         skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
-        skills = [x for x in skills if x] # remove nones
+        skills = [x for x in skills if x]  # remove nones
         # logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
         # okay now we need to get adjacent skills
@@ -314,7 +312,7 @@ class adjacentSkillContent(views.APIView):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=5)
-                skills_ranked = list(zip(*rankings))[0] # get the first element of each name, value (rank) pair and make a list
+                skills_ranked = list(zip(*rankings))[0]  # get the first element of each name, value (rank) pair and make a list
 
                 adjacent_skills_dict.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
                 adjacent_skills.extend(skills_ranked[1:])
@@ -340,7 +338,7 @@ class adjacentSkillContent(views.APIView):
         content_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         if len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No adjacent skills or related content found', 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_204_NO_CONTENT)
+            return Response({'response': 'No adjacent skills or related content found', 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_206_PARTIAL_CONTENT)
         else:
             return Response({'content': content_to_return[page*k:(page+1)*k], 'adjacent_skills': adjacent_skills_dict, 'num_results': len(content_to_return)}, status=status.HTTP_200_OK)
 
@@ -348,12 +346,11 @@ class adjacentSkillContent(views.APIView):
 class searchContent(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Search content')
-
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.searchContentSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # required
         content_type = request.data['type']
@@ -413,7 +410,7 @@ class searchContent(views.APIView):
             content_to_return_ranked = content_to_return
 
         if len(content_to_return) == 0:
-            return Response({'status': 'warning', 'response': 'No matching skills or content titles found'}, status=status.HTTP_200_OK)
+            return Response({'response': 'No matching skills or content titles found'}, status=status.HTTP_206_PARTIAL_CONTENT)
         else:
             resp = {'content': content_to_return_ranked[page*k:(page+1)*k]}
             if 'skills' in locals():
@@ -424,31 +421,31 @@ class searchContent(views.APIView):
 class recommendContent(views.APIView):
     """ generate recommendations for given a job title and content history """
     @silk_profile(name='Recommend content')
-
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.recommendContentSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # first match the free-form job title provided to one embedded in our database
         position: str = request.data['position']
-        start = time.perf_counter()
         job: Job = search_fuzzy_cache(Job, position, force_result=True)[0].first()
-        logger.debug(f'Job search time: {time.perf_counter() - start}')
         # if job is None:
-        #     return Response({'status': 'error', 'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
+        #     return Response({'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []
         for content_id in request.data['lastconsumedcontent']:
-            try:
-                content = Content.objects.get(uuid=content_id, deleted=False)
-                content_history.append(content)
-            except Content.DoesNotExist:
-                return Response({'status': 'error', 'response': f'Content with id {content_id} does not exist or has been deleted'}, status=status.HTTP_400_BAD_REQUEST)
+            if is_valid_uuid(content_id):
+                try:
+                    content = Content.objects.get(uuid=content_id, deleted=False)
+                    content_history.append(content)
+                except Content.DoesNotExist:
+                    return Response({'response': f'Content with id {content_id} does not exist or has been deleted'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'response': f'Invalid UUID {content_id}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # just for debugging purposes, force if we have an empty list
+        # NOTE just for debugging purposes, force if we have an empty list
         if len(content_history) == 0:
             content_history = [Content.objects.get(uuid="7be2638d-4baf-4089-b300-cf4c34c6a203")]
             logger.warning('Empty content history, forcing content_history to 7be2638d-4baf-4089-b300-cf4c34c6a203')
@@ -458,14 +455,14 @@ class recommendContent(views.APIView):
         content_history_center = np.average(content_history_vectors, axis=0)
 
         # get the weights of job and history and compute the center of the recomendation in the embedding space
-        job_weight, history_weight = request.data.get('weights', [1, 1]) # default to equal weights
+        job_weight, history_weight = request.data.get('weights', [1, 1])  # default to equal weights
         recomendation_center = np.average([np.array(job.embedding_all_mpnet_base_v2), content_history_center], axis=0, weights=[job_weight, history_weight])
 
         # now get the closest k content to the recomendation center via our faiss index
         k: int = request.data['k']
-        page: int = request.data.get('page', 0) # default to 0
-        temperature = float(request.data.get('temperature', 0)/100) # default to 0
-        if temperature == 0: # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
+        page: int = request.data.get('page', 0)  # default to 0
+        temperature = float(request.data.get('temperature', 0)/100)  # default to 0
+        if temperature == 0:  # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
             k = k*10
         results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+1), min_distance=temperature, truncate_results=False)
         content_to_return = results
@@ -501,7 +498,6 @@ class recommendContent(views.APIView):
             if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
                 content_ids_to_return_ranked.append(content_id_ranked)
 
-
         # NOTE hijacking this to demo vodafone content
         vodafone_results, vodafone_rankings, query_vector = index.vodafone_index.query(recomendation_center, k=1)
         vodafone_content_id = vodafone_rankings[0][0]
@@ -524,7 +520,7 @@ class jobSkillMatch(views.APIView):
         try:
             jsonschema.validate(request.data, schema=schemas.jobSkillMatchSchema)
         except jsonschema.exceptions.ValidationError as err:
-            return Response({'status': 'error', 'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0].first()
 
@@ -540,13 +536,15 @@ class jobSkillMatch(views.APIView):
 
 # cache views
 
+
 class clearCache(views.APIView):
     """ clear the cache """
+
     def delete(self, request: Request):
         cache.clear()
-        return Response({'status': 'success'}, status=status.HTTP_200_OK)
+        return Response({'response': 'success'}, status=status.HTTP_200_OK)
 
-# Topic CRUD class views
+# CRUD class views
 
 
 class topicList(views.APIView):
@@ -554,35 +552,77 @@ class topicList(views.APIView):
         return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
 
 
-class topic(views.APIView):
-    """ CRUD for specified topic """
+class stringEmbeddingCRUD(views.APIView):
+    """ CRUD for specified object and instance """
 
-    def get(self, request: Request, name: str):
-        name = name.lower()
-        if Topic.objects.filter(name=name).count() > 0:
-            return Response(TopicSerializerAll(Topic.objects.get(name=name)).data, status=status.HTTP_200_OK)
+    def get(self, request: Request, model_choice: str, name: str):
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'job':
+            model = Job
         else:
-            return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
 
-    def post(self, request: Request, name: str):
-        name = name.lower()
-        if Topic.objects.filter(name=name).count() > 0:
-            return Response({'status': 'exists', 'response': f'topic {name} already exists'}, status=status.HTTP_302_FOUND)
+        if model.objects.filter(name=name).count() > 0:
+            return Response(model.objects.filter(name=name).values()[0], status=status.HTTP_200_OK)
         else:
-            topic = Topic()
-            topic.create(name, ai.embedding_model.encode([name])[0])
-            topic.save()
-            threading.Thread(target=index.topic_index.generate_index).start()
-            return Response({'status': 'success', 'response': f'{name} created'}, status=status.HTTP_201_CREATED)
+            return Response({'response': f'{model_choice} {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    def delete(self, request: Request, name: str):
-        name = name.lower()
-        if Topic.objects.filter(name=name).count() > 0:
-            Topic.objects.get(name=name).delete()
-            threading.Thread(target=index.topic_index.generate_index).start()
-            return Response({'status': 'success', 'response': f'{name} deleted'}, status=status.HTTP_200_OK)
+    def post(self, request: Request, model_choice: str, name: str):
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'job':
+            model = Job
         else:
-            return Response({'status': 'error', 'response': f'topic {name} not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+
+        if model.objects.filter(name=name).count() > 0:
+            return Response({'response': f'{model_choice} {name} already exists'}, status=status.HTTP_302_FOUND)
+        else:
+            object = model()
+            object.create(name, ai.embedding_model.encode([name])[0])
+            object.save()
+
+            if not DEBUG:
+                if model == Topic:
+                    target = index.topic_index._generate_index()
+                elif model == Skill:
+                    target = index.skills_index._generate_index()
+                elif model == Job:
+                    target = index.jobs_index._generate_index()
+                threading.Thread(target=target).start()
+
+            return Response({'response': f'{name} created'}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request: Request, model_choice: str, name: str):
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'job':
+            model = Job
+        else:
+            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+
+        if model.objects.filter(name=name).count() > 0:
+            model.objects.get(name=name).delete()
+
+            if not DEBUG:
+                if model == Topic:
+                    target = index.topic_index._generate_index()
+                elif model == Skill:
+                    target = index.skills_index._generate_index()
+                elif model == Job:
+                    target = index.jobs_index._generate_index()
+                threading.Thread(target=target).start()
+
+            return Response({'response': f'{name} deleted'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'response': f'{model_choice} {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class alive(views.APIView):

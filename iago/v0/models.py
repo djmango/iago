@@ -19,7 +19,7 @@ class StringEmbedding(models.Model):
 
     def create(self, name: str, embedding: list | np.ndarray | None = None):
         """ Set name and generate embedding """
-        self.name = name.lower()
+        self.name = name
         self.embedding_all_mpnet_base_v2 = list(embedding)
         return self
 

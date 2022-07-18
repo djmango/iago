@@ -24,7 +24,7 @@ urlpatterns = [
     path('topics/', views.topicList.as_view()),
     path('transform/', views.transform.as_view()),
     path('cache/clear', views.clearCache.as_view()),
-    path('topics/<str:name>', views.topic.as_view()),
+    path('objects/<str:model_choice>/<str:name>', views.stringEmbeddingCRUD.as_view()),
 ]
 
 # this file only runs once so its a good way to do init stuff, maybe not best practice tho 

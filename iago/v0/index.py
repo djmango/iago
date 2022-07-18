@@ -11,7 +11,7 @@ from iago.settings import DEBUG
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Skill, Topic, UnsplashPhoto
+from v0.models import Content, Job, Skill, Topic, UnsplashPhoto
 from v0.utils import generate_cache_key, get_hash
 
 HERE = Path(__file__).parent
@@ -152,8 +152,10 @@ skills_index: VectorIndex
 content_index: VectorIndex
 unsplash_photo_index: VectorIndex
 vodafone_index: VectorIndex
+jobs_index: VectorIndex
 if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
+    jobs_index = VectorIndex(Job.objects.all())
     unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
     skills_index = VectorIndex(Skill.objects.all())
     # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
