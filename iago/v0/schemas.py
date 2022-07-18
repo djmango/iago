@@ -121,7 +121,7 @@ autocompleteSchema = {
         "model": {
             "type": "string",
             "description": "The model type to autocomplete",
-            "enum": ["topic", "skill", "content"]
+            "enum": ["topic", "skill", "content", "job"]
         },
         "k": {
             "type": "integer",

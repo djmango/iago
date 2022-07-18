@@ -274,6 +274,8 @@ class modelAutocomplete(views.APIView):
             model = Skill
         elif model_choice == 'content':
             model = Content
+        elif model_choice == 'job':
+            model = Job
         else:
             return Response({'status': 'error', 'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
