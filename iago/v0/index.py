@@ -157,7 +157,6 @@ if not DEBUG or False: # set to true to enable indexes in debug
     topic_index = VectorIndex(Topic.objects.all())
     jobs_index = VectorIndex(Job.objects.all())
     unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
-    skills_index = VectorIndex(Skill.objects.all())
-    # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))))
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200)))) # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
     vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))
+    skills_index = VectorIndex(Skill.objects.all())

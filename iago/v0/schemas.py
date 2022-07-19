@@ -154,6 +154,33 @@ embedsSchema = {
     "required": ["embeds"],
 }
 
+
+adjacentSkillsSchema = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "skills": {
+            "type": "array",
+            "uniqueItems": True,
+            "items": {
+                "type": "string"
+            }
+        },
+        "k": {
+            "type": "integer",
+            "description": "The number of adjacent skills to return per skill.",
+            "exclusiveMinimum": 0
+        },
+        "temperature": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+            "inclusiveMaximum": 100
+        }
+
+    },
+    "required": ["skills"],
+}
+
 searchContentSchema = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -203,6 +230,15 @@ searchContentSchema = {
         "strict": {
             "type": "boolean",
             "description": "If true, only return content that matches ALL skills provided, assuming the skill exists in the database.",
+        },
+        "fields": {
+            "type": "array",
+            "description": "The fields to return.",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": [x.name for x in Content._meta.get_fields()],
+            }
         }
 
     },
@@ -255,36 +291,18 @@ adjacentSkillContentSchema = {
             "type": "integer",
             "description": "The page to return. Each page has k elements. Defaults to 0.",
             "inclusiveMinimum": 0
+        },
+        "fields": {
+            "type": "array",
+            "description": "The fields to return.",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": [x.name for x in Content._meta.get_fields()],
+            }
         }
     },
     "required": ["skills", "type", "k"]
-}
-
-
-adjacentSkillsSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "skills": {
-            "type": "array",
-            "uniqueItems": True,
-            "items": {
-                "type": "string"
-            }
-        },
-        "k": {
-            "type": "integer",
-            "description": "The number of adjacent skills to return per skill.",
-            "exclusiveMinimum": 0
-        },
-        "temperature": {
-            "type": "integer",
-            "inclusiveMinimum": 0,
-            "inclusiveMaximum": 100
-        }
-
-    },
-    "required": ["skills"],
 }
 
 recommendContentSchema = {

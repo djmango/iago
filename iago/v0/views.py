@@ -303,7 +303,6 @@ class adjacentSkillContent(views.APIView):
         # start = time.perf_counter()
         skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
         skills = [x for x in skills if x]  # remove nones
-        # logger.debug(f'Singlethread skill map took {round(time.perf_counter() - start, 3)}s')
 
         # okay now we need to get adjacent skills
         adjacent_skills_dict = []
@@ -335,12 +334,25 @@ class adjacentSkillContent(views.APIView):
         content_to_return = content_to_return.distinct('uuid')
 
         # perform the transaction
-        content_to_return = list(content_to_return.values_list('uuid', flat=True))
-
-        if len(content_to_return) == 0:
+        content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
+        if len(content_to_return_ids) == 0:
             return Response({'response': 'No adjacent skills or related content found', 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_206_PARTIAL_CONTENT)
+
+        # slice the content_to_return_ids list to get the page we want
+        content_to_return_ids = content_to_return_ids[page*k:(page+1)*k]
+
+        # determine if we want to return fields or just uuid
+        fields = request.data.get('fields')
+        if fields and not all(f == 'uuid' for f in fields):
+            content_to_return = Content.objects.filter(uuid__in=content_to_return_ids)
+            content_to_return = content_to_return.values(*fields)
+            resp = {'content': content_to_return}
         else:
-            return Response({'content': content_to_return[page*k:(page+1)*k], 'adjacent_skills': adjacent_skills_dict, 'num_results': len(content_to_return)}, status=status.HTTP_200_OK)
+            resp = {'content': content_to_return_ids}
+
+        # add the aux data and respond
+        resp['adjacent_skills'] = adjacent_skills_dict
+        return Response(resp, status=status.HTTP_200_OK)
 
 
 class searchContent(views.APIView):
@@ -356,12 +368,12 @@ class searchContent(views.APIView):
         content_type = request.data['type']
         k: int = request.data['k']
         # oneOf
-        query_string = request.data['searchtext'] if 'searchtext' in request.data else None
-        query_skills = request.data['skills'] if 'skills' in request.data else None
+        query_string = request.data.get('searchtext')
+        query_skills = request.data.get('skills')
         # optional
-        strict = request.data['strict'] if 'strict' in request.data else False
-        length = request.data['length'] if 'length' in request.data else None
-        page: int = request.data['page'] if 'page' in request.data else 0
+        strict = request.data.get('strict', False)
+        length = request.data.get('length')
+        page: int = request.data.get('page', 0)
 
         content_to_return = Content.objects.none()
 
@@ -395,27 +407,35 @@ class searchContent(views.APIView):
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
-        # perform the transaction
-        # TODO: this needs to be switched to just ids, need e64 to make the changes on the front end
-        content_to_return = list(content_to_return.values('uuid', 'title', 'url', 'skills', 'thumbnail', 'popularity', 'provider', 'content_read_seconds', 'type', 'updated_on'))
-
-        # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
-        content_to_return_ids = [x['uuid'] for x in content_to_return]
-        if query_string:
-            content_to_return_ranked = []
-            for content_id, score in rankings:
-                if content_id in content_to_return_ids:
-                    content_to_return_ranked.append(content_to_return[content_to_return_ids.index(content_id)])
-        else:
-            content_to_return_ranked = content_to_return
-
-        if len(content_to_return) == 0:
+        # perform the transaction to get all uuids, not limited by k or page because we havent ranked them yet
+        content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
+        if len(content_ids_to_return) == 0:
             return Response({'response': 'No matching skills or content titles found'}, status=status.HTTP_206_PARTIAL_CONTENT)
+        
+        # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
+        if query_string:
+            content_ids_to_return_ranked = []
+            for content_id_ranked, score in rankings:
+                if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
+                    content_ids_to_return_ranked.append(content_id_ranked)
         else:
-            resp = {'content': content_to_return_ranked[page*k:(page+1)*k]}
-            if 'skills' in locals():
-                resp['skills'] = [x.name for x in skills if x is not None]
-            return Response(resp, status=status.HTTP_200_OK)
+            content_ids_to_return_ranked = content_ids_to_return
+
+        # slice the content_ids_to_return_ranked list to get the page we want
+        content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
+
+        # determine if we want to return fields or just uuid
+        fields = request.data.get('fields')
+        if fields and not all(f == 'uuid' for f in fields):
+            content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
+            content_to_return = content_to_return.values(*fields)
+            resp = {'content': content_to_return}
+        else:
+            resp = {'content': content_ids_to_return_ranked}
+
+        if query_skills:
+            resp['skills'] = [x.name for x in skills if x is not None]
+        return Response(resp, status=status.HTTP_200_OK)
 
 
 class recommendContent(views.APIView):
@@ -438,10 +458,10 @@ class recommendContent(views.APIView):
         for content_id in request.data['lastconsumedcontent']:
             if is_valid_uuid(content_id):
                 try:
-                    content = Content.objects.get(uuid=content_id, deleted=False)
+                    content = Content.objects.get(uuid=content_id)
                     content_history.append(content)
                 except Content.DoesNotExist:
-                    return Response({'response': f'Content with id {content_id} does not exist or has been deleted'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'response': f'Content with UUID {content_id} does not exist'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({'response': f'Invalid UUID {content_id}'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -483,9 +503,6 @@ class recommendContent(views.APIView):
         if provider:
             content_to_return = content_to_return.filter(provider__in=provider)
 
-        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
-        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
-
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
@@ -508,9 +525,9 @@ class recommendContent(views.APIView):
         if fields and not all(f == 'uuid' for f in fields):
             content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked[page*k:(page+1)*k])
             content_to_return = content_to_return.values(*fields)
-            return Response({'content_recommendations': content_to_return, 'matched_job': job.name}, status=status.HTTP_200_OK)
+            return Response({'content': content_to_return, 'matched_job': job.name}, status=status.HTTP_200_OK)
         else:
-            return Response({'content_recommendations': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
+            return Response({'content': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

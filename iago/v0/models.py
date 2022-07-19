@@ -38,7 +38,7 @@ class GenericStringEmbedding(StringEmbedding):
 
 
 class Topic(StringEmbedding):
-    """ Topic object, with embedding field """
+    """ Topic object, topic name and assosiated embedding field """
     pass
 
 
@@ -46,8 +46,12 @@ class Job(StringEmbedding):
     """ Job object, a job title and assosiated embedding field """
     pass
 
+class MindtoolSkill(StringEmbedding):
+    """ Mindtool skill area object, a skill name and assosiated embedding field """
+    pass
 
 class Skill(StringEmbedding):
+    """ Skill object, a skill name and assosiated embedding field """
     cluster = models.ForeignKey('SkillCluster', on_delete=models.SET_NULL, blank=True, null=True)
 
 

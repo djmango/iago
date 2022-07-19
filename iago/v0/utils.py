@@ -239,7 +239,7 @@ def generate_cache_key(*args, **kwargs):
     return str(get_hash((args, kwargs)).hex())
 
 
-def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False):
+def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False, field_name='name'):
     """ Gets closest queryset object to the given name
 
     Args:
@@ -248,7 +248,8 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         k (int): Max number of results to return
         similarity_minimum (float): Minimum similarity (max 1)
         use_cashed (bool, optional): Allow pulling a search result from cache, defaults to True
-
+        force_result (bool, optional): Force a search result via recursive deduction of the similarity_minimum, defaults to False
+        field_name (str, optional): Fieldname to perform the search on for, defaults to 'name'
     Returns:
         QuerySet: K Closest matched instances, from cache if available
         List: Pks of closest matched instances ordered by similarity
@@ -265,7 +266,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         # so we have to force the execution now
         # and then cache a queryset thats just filtering for the resulting pks
         # otherwise we cache a trigram similarity query which is much slower to execute
-        results_pk = list(model.objects.annotate(similarity=TrigramSimilarity('name', name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
+        results_pk = list(model.objects.annotate(similarity=TrigramSimilarity(field_name, name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
         results = model.objects.filter(pk__in=results_pk)
         cache.set(cache_key, (results, results_pk), timeout=60*60*24*2)  # 2 day timeout
 
