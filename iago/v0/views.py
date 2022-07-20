@@ -411,7 +411,7 @@ class searchContent(views.APIView):
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
         if len(content_ids_to_return) == 0:
             return Response({'response': 'No matching skills or content titles found'}, status=status.HTTP_206_PARTIAL_CONTENT)
-        
+
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
         if query_string:
             content_ids_to_return_ranked = []
@@ -433,6 +433,7 @@ class searchContent(views.APIView):
         else:
             resp = {'content': content_ids_to_return_ranked}
 
+        # add the aux data and respond
         if query_skills:
             resp['skills'] = [x.name for x in skills if x is not None]
         return Response(resp, status=status.HTTP_200_OK)
@@ -520,14 +521,21 @@ class recommendContent(views.APIView):
         vodafone_content_id = vodafone_rankings[0][0]
         content_ids_to_return_ranked.insert(0, vodafone_content_id)
 
+        # slice the content_ids_to_return_ranked list to get the page we want
+        content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
+
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
         if fields and not all(f == 'uuid' for f in fields):
-            content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked[page*k:(page+1)*k])
+            content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
             content_to_return = content_to_return.values(*fields)
-            return Response({'content': content_to_return, 'matched_job': job.name}, status=status.HTTP_200_OK)
+            resp = {'content': content_to_return}
         else:
-            return Response({'content': content_ids_to_return_ranked[page*k:(page+1)*k], 'matched_job': job.name}, status=status.HTTP_200_OK)
+            resp = {'content': content_ids_to_return_ranked}
+
+        # add the aux data and respond
+        resp['matched_job'] = job.name
+        return Response(resp, status=status.HTTP_200_OK)
 
 
 class jobSkillMatch(views.APIView):

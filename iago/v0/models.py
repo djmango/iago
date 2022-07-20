@@ -46,9 +46,13 @@ class Job(StringEmbedding):
     """ Job object, a job title and assosiated embedding field """
     pass
 
-class MindtoolSkill(StringEmbedding):
+class MindtoolsSkillGroup(StringEmbedding):
     """ Mindtool skill area object, a skill name and assosiated embedding field """
     pass
+
+class MindtoolsSkillSubgroup(StringEmbedding):
+    """ Mindtool skill sub-area object, a skill name and assosiated embedding field """
+    group = models.ForeignKey(MindtoolsSkillGroup, on_delete=models.CASCADE)
 
 class Skill(StringEmbedding):
     """ Skill object, a skill name and assosiated embedding field """
