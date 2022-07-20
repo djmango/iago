@@ -99,7 +99,7 @@ def medium_to_markdown(text_block: dict, i: int, paragraphs_raw: list[dict]) -> 
         else:
             text = f"1. {text}"  # if this is the first number we can just use 1 without checks
 
-    elif text_block['type'] == 11:  # iframe, just post the thumbnail. TODO: actual embeds are going to be a bit more difficult
+    elif text_block['type'] == 11:  #? : iframe, just post the thumbnail. actual embeds are going to be a bit more difficult
         if 'thumbnailurl' in text_block['iframe']:
             text = f'![alt text]({text_block["iframe"]["thumbnailurl"]} "{text}"'
         else:

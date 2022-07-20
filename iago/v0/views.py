@@ -24,26 +24,185 @@ from v0.utils import allowedFile, is_valid_uuid, search_fuzzy_cache
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
 
+# * Skills Views
 
-class transform(views.APIView):
-    """ transform texts """
-    allowed_groups = {}
+
+class skills_match(views.APIView):
+    """ take texts and return their embedding and related skills """
 
     def get(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.textsSchema)
+            jsonschema.validate(request.data, schema=schemas.texts)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
-        # embed
-        embeds = ai.embedding_model.encode(request.data['texts'])
+        texts = request.data['texts']
 
-        return Response({'vectors': embeds}, status=status.HTTP_200_OK)
+        # embed all texts in batch
+        embeds = ai.embedding_model.encode(texts)
+
+        results = []
+        # find skills for each text/vector and populate results
+        for embed in embeds:
+            # find the closest skills
+            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
+
+            # add to results
+            results.append({
+                'skills': skills_ranked,
+                'embed': embed.tolist()
+            })
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
 
 
-# content file upload - vodafone rn
+class skills_match_embeds(views.APIView):
+    """ take embeds return their related skills """
 
-class contentFileUploadView(views.APIView):
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.embeds)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        # find skills for each text/vector and populate results
+        for embed in request.data['embeds']:
+            # find the closest skills
+            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
+            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
+
+            # add to results
+            results.append({
+                'skills': skills_ranked
+            })
+
+        return Response({'results': results}, status=status.HTTP_200_OK)
+
+
+class skills_adjacent(views.APIView):
+    """ take embeds return their related skills """
+    @silk_profile(name='Adjacent skills')
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.skills_adjacent)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        k = request.data['k'] if 'k' in request.data else 25
+        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else .21
+        query_skills = request.data['skills']
+
+        # for each skill in the query, find its closest match in the skills database
+        # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
+        skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
+
+        adjacent_skills = []
+        for skill, skill_name in zip(skills, query_skills):
+            if skill is not None:
+                # get adjacent skills for our skill
+                results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
+                skills_ranked = list(zip(*rankings))[0]
+
+                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:k+1]})
+
+        return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
+
+
+# * Index Views
+
+
+class index_rebuild(views.APIView):
+    """ rebuild the index """
+
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.index)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        index_choice = str(request.data['index'])
+
+        if index_choice == 'topic':
+            query_index = index.topic_index
+        elif index_choice == 'skill':
+            query_index = index.skills_index
+        elif index_choice == 'content':
+            query_index = index.content_index
+        elif index_choice == 'unsplash':
+            query_index = index.unsplash_photo_index
+        elif index_choice == 'vodafone':
+            query_index = index.vodafone_index
+        else:
+            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        query_index._generate_index()  # it aint smooth, worried about mem-lock but whatever
+
+        return Response({'response': 'success'}, status=status.HTTP_200_OK)
+
+
+class index_query(views.APIView):
+
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.index_query_k)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        k = int(request.data['k'])
+        index_choice = str(request.data['index'])
+        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else 0
+
+        if index_choice == 'topic':
+            query_index = index.topic_index
+        elif index_choice == 'skill':
+            query_index = index.skills_index
+        elif index_choice == 'content':
+            query_index = index.content_index
+        elif index_choice == 'unsplash':
+            query_index = index.unsplash_photo_index
+        elif index_choice == 'vodafone':
+            query_index = index.vodafone_index
+        else:
+            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results, rankings, query_vector = query_index.query(query, k, temperature)
+
+        results_pk = results.values_list('pk', flat=True)
+        results_ranked = []
+        for pk, score in rankings[:k]:
+            results_ranked.append(results.filter(pk=pk).values().first())
+
+        return Response({'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
+
+# * Content Views
+
+
+class content_update(views.APIView):
+    """ update scraped articles with their medium data """
+
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.k)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        k = int(request.data['k'])
+
+        start = time.perf_counter()
+        articles_uuid = list(Content.objects.filter(deleted=False).order_by('updated_on')[:k].values_list('uuid', flat=True))
+        logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
+        logger.info(f'Updating data for {len(articles_uuid)} articles')
+
+        pool = ThreadPool(processes=4)
+        pool.map_async(updateArticle, articles_uuid)
+
+        return Response({'response': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
+
+
+class content_file_upload(views.APIView):  # vodafone
     """ file upload and full processing, however only pdf format, supports multiple file uploads """
 
     parser_classes = (MultiPartParser, FormParser)
@@ -82,213 +241,12 @@ class contentFileUploadView(views.APIView):
             return Response(fileSerializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class matchSkills(views.APIView):
-    """ take texts and return their embedding and related skills """
-
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.textsSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        texts = request.data['texts']
-
-        # embed all texts in batch
-        embeds = ai.embedding_model.encode(texts)
-
-        results = []
-        # find skills for each text/vector and populate results
-        for embed in embeds:
-            # find the closest skills
-            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
-
-            # add to results
-            results.append({
-                'skills': skills_ranked,
-                'embed': embed.tolist()
-            })
-
-        return Response({'results': results}, status=status.HTTP_200_OK)
-
-
-class matchSkillsEmbeds(views.APIView):
-    """ take embeds return their related skills """
-
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.embedsSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        results = []
-        # find skills for each text/vector and populate results
-        for embed in request.data['embeds']:
-            # find the closest skills
-            skills, rankings, query_vector = index.skills_index.query(embed, k=10, min_distance=.21)  # NOTE these are hardcoded for now, important params if you want to change results
-            skills_ranked = list(zip(*rankings))[0]  # rankings are keyed by pk which in skill objects case is the name
-
-            # add to results
-            results.append({
-                'skills': skills_ranked
-            })
-
-        return Response({'results': results}, status=status.HTTP_200_OK)
-
-
-class adjacentSkills(views.APIView):
-    """ take embeds return their related skills """
-    @silk_profile(name='Adjacent skills')
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.adjacentSkillsSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        k = request.data['k'] if 'k' in request.data else 25
-        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else .21
-        query_skills = request.data['skills']
-
-        # for each skill in the query, find its closest match in the skills database
-        # skills is a list of results lists, but we only ask for 1 result per (sometimes if there are no matches it returns an empty list, so make sure that doesnt cause an error)
-        skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
-
-        adjacent_skills = []
-        for skill, skill_name in zip(skills, query_skills):
-            if skill is not None:
-                # get adjacent skills for our skill
-                results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=k+1, min_distance=temperature)  # we have to add one to k because the first result is always going to be the provided skill itself
-                skills_ranked = list(zip(*rankings))[0]
-
-                adjacent_skills.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:k+1]})
-
-        return Response({'skills': adjacent_skills}, status=status.HTTP_200_OK)
-
-
-class updateContent(views.APIView):
-    """ update scraped articles with their medium data """
-
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.kSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        k = int(request.data['k'])
-
-        start = time.perf_counter()
-        articles_uuid = list(Content.objects.filter(deleted=False).order_by('updated_on')[:k].values_list('uuid', flat=True))
-        logger.info(f'Getting articles took {time.perf_counter()-start:.3f}s')
-        logger.info(f'Updating data for {len(articles_uuid)} articles')
-
-        pool = ThreadPool(processes=4)
-        pool.map_async(updateArticle, articles_uuid)
-
-        return Response({'response': 'started', 'count': len(articles_uuid)}, status=status.HTTP_200_OK)
-
-# index views
-
-
-class rebuildIndex(views.APIView):
-    """ rebuild the index """
-
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.indexSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        index_choice = str(request.data['index'])
-
-        if index_choice == 'topic':
-            query_index = index.topic_index
-        elif index_choice == 'skill':
-            query_index = index.skills_index
-        elif index_choice == 'content':
-            query_index = index.content_index
-        elif index_choice == 'unsplash':
-            query_index = index.unsplash_photo_index
-        elif index_choice == 'vodafone':
-            query_index = index.vodafone_index
-        else:
-            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        query_index._generate_index()  # it aint smooth, worried about mem-lock but whatever
-
-        return Response({'response': 'success'}, status=status.HTTP_200_OK)
-
-
-class queryIndex(views.APIView):
-
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.queryKIndexSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        query = str(request.data['query'])
-        k = int(request.data['k'])
-        index_choice = str(request.data['index'])
-        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else 0
-
-        if index_choice == 'topic':
-            query_index = index.topic_index
-        elif index_choice == 'skill':
-            query_index = index.skills_index
-        elif index_choice == 'content':
-            query_index = index.content_index
-        elif index_choice == 'unsplash':
-            query_index = index.unsplash_photo_index
-        elif index_choice == 'vodafone':
-            query_index = index.vodafone_index
-        else:
-            return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        results, rankings, query_vector = query_index.query(query, k, temperature)
-
-        results_pk = results.values_list('pk', flat=True)
-        results_ranked = []
-        for pk, score in rankings[:k]:
-            results_ranked.append(results.filter(pk=pk).values().first())
-
-        return Response({'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
-
-
-class modelAutocomplete(views.APIView):
-    @silk_profile(name='Model autocomplete')
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.autocompleteSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        query = str(request.data['query'])
-        model_choice = str(request.data['model'])
-        k = int(request.data['k'])
-        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
-
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'content':
-            model = Content
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
-
-        return Response({'results': results_pk}, status=status.HTTP_200_OK)
-
-
-class adjacentSkillContent(views.APIView):
+class content_via_adjacent_skills(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Adjacent skill content')
     def get(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.adjacentSkillContentSchema)
+            jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -336,7 +294,7 @@ class adjacentSkillContent(views.APIView):
         # perform the transaction
         content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
         if len(content_to_return_ids) == 0:
-            return Response({'response': 'No adjacent skills or related content found', 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_206_PARTIAL_CONTENT)
+            return Response({'response': 'No adjacent skills or related content found', 'content': [], 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_206_PARTIAL_CONTENT)
 
         # slice the content_to_return_ids list to get the page we want
         content_to_return_ids = content_to_return_ids[page*k:(page+1)*k]
@@ -355,12 +313,12 @@ class adjacentSkillContent(views.APIView):
         return Response(resp, status=status.HTTP_200_OK)
 
 
-class searchContent(views.APIView):
+class content_via_search(views.APIView):
     """ search for content based on skills """
     @silk_profile(name='Search content')
     def get(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.searchContentSchema)
+            jsonschema.validate(request.data, schema=schemas.content_via_search)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -410,7 +368,7 @@ class searchContent(views.APIView):
         # perform the transaction to get all uuids, not limited by k or page because we havent ranked them yet
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
         if len(content_ids_to_return) == 0:
-            return Response({'response': 'No matching skills or content titles found'}, status=status.HTTP_206_PARTIAL_CONTENT)
+            return Response({'response': 'No matching skills or content titles found', 'content': []}, status=status.HTTP_206_PARTIAL_CONTENT)
 
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
         if query_string:
@@ -439,12 +397,12 @@ class searchContent(views.APIView):
         return Response(resp, status=status.HTTP_200_OK)
 
 
-class recommendContent(views.APIView):
+class content_via_recommendation(views.APIView):
     """ generate recommendations for given a job title and content history """
     @silk_profile(name='Recommend content')
     def get(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.recommendContentSchema)
+            jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -462,9 +420,9 @@ class recommendContent(views.APIView):
                     content = Content.objects.get(uuid=content_id)
                     content_history.append(content)
                 except Content.DoesNotExist:
-                    return Response({'response': f'Content with UUID {content_id} does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'response': f'Content with UUID {content_id} does not exist', 'content': []}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response({'response': f'Invalid UUID {content_id}'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'response': f'Invalid UUID {content_id}', 'content': []}, status=status.HTTP_400_BAD_REQUEST)
 
         # NOTE just for debugging purposes, force if we have an empty list
         if len(content_history) == 0:
@@ -483,15 +441,14 @@ class recommendContent(views.APIView):
         k: int = request.data['k']
         page: int = request.data.get('page', 0)  # default to 0
         temperature = float(request.data.get('temperature', 0)/100)  # default to 0
-        if temperature == 0:  # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
-            k = k*10
+        p = 10 if temperature == 0 else 1  # # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
 
         # NOTE okay new hijack, we will now recommend a single piece of vodafone content, and then match the remaining content to that vodafone content, this is still a hijack yes
         vodafone_results, vodafone_rankings, query_vector = index.vodafone_index.query(recomendation_center, k=1)
-        
-        results, rankings, query_vector = index.content_index.query(vodafone_results[0].embedding_all_mpnet_base_v2, k=k*(page+1), min_distance=temperature, truncate_results=False)
+
+        results, rankings, query_vector = index.content_index.query(vodafone_results[0].embedding_all_mpnet_base_v2, k=k*p*(page+1), min_distance=temperature, truncate_results=False)
         # results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+1), min_distance=temperature, truncate_results=False)
-        
+
         content_to_return = results
 
         # apply filters
@@ -523,7 +480,6 @@ class recommendContent(views.APIView):
                 content_ids_to_return_ranked.append(content_id_ranked)
 
         # NOTE hijacking this to demo vodafone content
-        # vodafone_results, vodafone_rankings, query_vector = index.vodafone_index.query(recomendation_center, k=1)
         vodafone_content_id = vodafone_rankings[0][0]
         content_ids_to_return_ranked.insert(0, vodafone_content_id)
 
@@ -541,47 +497,24 @@ class recommendContent(views.APIView):
 
         # add the aux data and respond
         resp['matched_job'] = job.name
-        resp['hijacked'] = True # lol
+        resp['hijacked'] = True  # lol
         return Response(resp, status=status.HTTP_200_OK)
 
-
-class jobSkillMatch(views.APIView):
-    """ take a job title string and return matching skills """
-
-    def post(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.jobSkillMatchSchema)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        job: Job = search_fuzzy_cache(Job, request.data['jobtitle'])[0].first()
-
-        if job is None:  # if we have no matched jobs just return an empty list since we only want to search using existing jobtitles with embeds, not generate new ones
-            return Response({'skills': []}, status=status.HTTP_200_OK)
-        k = request.data['k'] if 'k' in request.data else 7
-
-        # search index
-        results, rankings, query_vector = index.skills_index.query(job.embedding_all_mpnet_base_v2, k=k)
-        skills_ranked = list(zip(*rankings))[0]
-
-        return Response({'jobtitle': str(job.name), 'skills': skills_ranked}, status=status.HTTP_200_OK)
-
-# cache views
+# * StringEmbedding Views
 
 
-class clearCache(views.APIView):
-    """ clear the cache """
+class stringEmbeddingListAll(views.APIView):
+    def get(self, request: Request, model_choice: str):
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'job':
+            model = Job
+        else:
+            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
 
-    def delete(self, request: Request):
-        cache.clear()
-        return Response({'response': 'success'}, status=status.HTTP_200_OK)
-
-# CRUD class views
-
-
-class topicList(views.APIView):
-    def get(self, request: Request):
-        return Response([str(topic) for topic in Topic.objects.all()], status=status.HTTP_200_OK)
+        return Response([str(x) for x in model.objects.all()], status=status.HTTP_200_OK)
 
 
 class stringEmbeddingCRUD(views.APIView):
@@ -655,6 +588,61 @@ class stringEmbeddingCRUD(views.APIView):
             return Response({'response': f'{name} deleted'}, status=status.HTTP_200_OK)
         else:
             return Response({'response': f'{model_choice} {name} not found'}, status=status.HTTP_404_NOT_FOUND)
+
+# * Utility Views
+
+
+class transform(views.APIView):
+    """ transform texts """
+    allowed_groups = {}
+
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.texts)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        # embed
+        embeds = ai.embedding_model.encode(request.data['texts'])
+
+        return Response({'vectors': embeds}, status=status.HTTP_200_OK)
+
+
+class object_autocomplete(views.APIView):
+    @silk_profile(name='Model autocomplete')
+    def get(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.autocomplete)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        model_choice = str(request.data['model'])
+        k = int(request.data['k'])
+        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
+
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'content':
+            model = Content
+        elif model_choice == 'job':
+            model = Job
+        else:
+            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
+
+        return Response({'results': results_pk}, status=status.HTTP_200_OK)
+
+
+class cache_clear(views.APIView):
+    """ clear the cache """
+
+    def delete(self, request: Request):
+        cache.clear()
+        return Response({'response': 'success'}, status=status.HTTP_200_OK)
 
 
 class alive(views.APIView):

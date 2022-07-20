@@ -1,38 +1,6 @@
 from v0.models import Content
 
-querySubmissionSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "query": {
-            "type": "string",
-        },
-        "text": {
-            "type": "string",
-        },
-        "k": {
-            "type": "integer"
-        }
-    },
-    "required": ["query"],
-}
-
-
-jobSkillMatchSchema = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "jobtitle": {
-            "type": "string",
-        },
-        "k": {
-            "type": "integer"
-        }
-    },
-    "required": ["jobtitle"],
-}
-
-kSchema = {
+k = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -44,7 +12,7 @@ kSchema = {
     "required": ["k"],
 }
 
-queryKSchema = {
+query_k = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -59,7 +27,7 @@ queryKSchema = {
     "required": ["query"],
 }
 
-indexSchema = {
+index = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -71,7 +39,7 @@ indexSchema = {
     "required": ["index"],
 }
 
-queryKIndexSchema = {
+index_query_k = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -95,7 +63,7 @@ queryKIndexSchema = {
     "required": ["query", "index"],
 }
 
-textsSchema = {
+texts = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -110,7 +78,7 @@ textsSchema = {
     "required": ["texts"],
 }
 
-autocompleteSchema = {
+autocomplete = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -139,7 +107,7 @@ autocompleteSchema = {
 }
 
 
-embedsSchema = {
+embeds = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -155,7 +123,7 @@ embedsSchema = {
 }
 
 
-adjacentSkillsSchema = {
+skills_adjacent = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -181,7 +149,7 @@ adjacentSkillsSchema = {
     "required": ["skills"],
 }
 
-searchContentSchema = {
+content_via_search = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -250,7 +218,7 @@ searchContentSchema = {
 }
 
 
-adjacentSkillContentSchema = {
+content_via_adjacent_skills = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -305,7 +273,7 @@ adjacentSkillContentSchema = {
     "required": ["skills", "type", "k"]
 }
 
-recommendContentSchema = {
+content_via_recommendation = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {

@@ -9,26 +9,30 @@ logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
 
 urlpatterns = [
-    path('index/query', views.queryIndex.as_view()),
-    path('index/rebuild', views.rebuildIndex.as_view()),
-    path('models/autocomplete', views.modelAutocomplete.as_view()),
-    path('content/update', views.updateContent.as_view()),
-    path('content/search', views.searchContent.as_view()),
-    path('content/recommend', views.recommendContent.as_view()),
-    path('content/adjacent_to_skills', views.adjacentSkillContent.as_view()),
-    path('content/upload', views.contentFileUploadView.as_view()),
-    path('skillspace/jobskillmatch', views.jobSkillMatch.as_view()),
-    path('skillspace/adjacent', views.adjacentSkills.as_view()),
-    path('skillspace/match', views.matchSkills.as_view()),
-    path('skillspace/match_embeds', views.matchSkillsEmbeds.as_view()),
-    path('topics/', views.topicList.as_view()),
-    path('transform/', views.transform.as_view()),
-    path('cache/clear', views.clearCache.as_view()),
+    path('cache/clear', views.cache_clear.as_view()),
+    path('content/adjacent_to_skills', views.content_via_adjacent_skills.as_view()),
+    path('content/recommend', views.content_via_recommendation.as_view()),
+    path('content/search', views.content_via_search.as_view()),
+    path('content/update', views.content_update.as_view()),
+    path('content/upload', views.content_file_upload.as_view()),
+    path('index/query', views.index_query.as_view()),
+    path('index/rebuild', views.index_rebuild.as_view()),
+    path('objects/autocomplete', views.object_autocomplete.as_view()),
     path('objects/<str:model_choice>/<str:name>', views.stringEmbeddingCRUD.as_view()),
+    path('objects/<str:model_choice>/all', views.stringEmbeddingListAll.as_view()),
+    path('skills/adjacent', views.skills_adjacent.as_view()),
+    path('skills/match_embeds', views.skills_match_embeds.as_view()),
+    path('skills/match', views.skills_match.as_view()),
+    path('transform/', views.transform.as_view()),
+    # ! deprecated
+    path('models/autocomplete', views.object_autocomplete.as_view()),
+    path('skillspace/match_embeds', views.skills_match_embeds.as_view()),
+    path('skillspace/adjacent', views.skills_adjacent.as_view()),
+    path('skillspace/match', views.skills_match.as_view()),
 ]
 
 # this file only runs once so its a good way to do init stuff, maybe not best practice tho 
-# TODO: change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
+#TODO change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
 if DEBUG:
     logger.debug('i am the onceler')
     logger.debug('i am the twiceler')

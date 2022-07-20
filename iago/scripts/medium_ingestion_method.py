@@ -88,7 +88,7 @@ def medium_to_markdown(text_block, last_type, i=0) -> str:
         text = f"```\n{text}\n```"
     elif text_block['type'] == 9: # bullet list
         text = f"* {text}"
-    elif text_block['type'] == 11: # iframe, just post the thumbnail. TODO: actual embeds are going to be a bit more difficult
+    elif text_block['type'] == 11: # iframe, just post the thumbnail, we wont include the actual iframe
         text = f'![alt text]({text_block["iframe"]["thumbnailurl"]} "{text}"'
     elif text_block['type'] == 13: # subtitle
         text = f"### {text}"

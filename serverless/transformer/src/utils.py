@@ -58,7 +58,7 @@ def create_logger(
     if time_zone:
         from pytz import timezone, utc
         def time_formatter(*args):
-            # TODO: Doesnt work with rich formatter
+            #TODO Doesnt work with rich formatter
             utc_dt = utc.localize(datetime.datetime.utcnow())
             my_tz = timezone(time_zone)
             converted = utc_dt.astimezone(my_tz)
