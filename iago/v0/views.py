@@ -12,7 +12,7 @@ from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.request import Request
-from silk.profiling.profiler import silk_profile
+# from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.article import updateArticle
@@ -83,7 +83,7 @@ class skills_match_embeds(views.APIView):
 
 class skills_adjacent(views.APIView):
     """ take embeds return their related skills """
-    @silk_profile(name='Adjacent skills')
+    # @silk_profile(name='Adjacent skills')
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.skills_adjacent)
@@ -243,7 +243,7 @@ class content_file_upload(views.APIView):  # vodafone
 
 class content_via_adjacent_skills(views.APIView):
     """ search for content based on skills """
-    @silk_profile(name='Adjacent skill content')
+    # @silk_profile(name='Adjacent skill content')
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
@@ -294,7 +294,7 @@ class content_via_adjacent_skills(views.APIView):
         # perform the transaction
         content_to_return_ids = list(content_to_return.values_list('uuid', flat=True))
         if len(content_to_return_ids) == 0:
-            return Response({'response': 'No adjacent skills or related content found', 'content': [], 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_206_PARTIAL_CONTENT)
+            return Response({'response': 'No adjacent skills or related content found', 'content': [], 'adjacent_skills': adjacent_skills_dict}, status=status.HTTP_200_OK)
 
         # slice the content_to_return_ids list to get the page we want
         content_to_return_ids = content_to_return_ids[page*k:(page+1)*k]
@@ -315,7 +315,7 @@ class content_via_adjacent_skills(views.APIView):
 
 class content_via_search(views.APIView):
     """ search for content based on skills """
-    @silk_profile(name='Search content')
+    # @silk_profile(name='Search content')
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_search)
@@ -399,7 +399,7 @@ class content_via_search(views.APIView):
 
 class content_via_recommendation(views.APIView):
     """ generate recommendations for given a job title and content history """
-    @silk_profile(name='Recommend content')
+    # @silk_profile(name='Recommend content')
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
@@ -609,7 +609,7 @@ class transform(views.APIView):
 
 
 class object_autocomplete(views.APIView):
-    @silk_profile(name='Model autocomplete')
+    # @silk_profile(name='Model autocomplete')
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.autocomplete)

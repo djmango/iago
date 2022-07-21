@@ -21,5 +21,5 @@ urlpatterns = [
     path('alive/', alive.as_view(), name='alive'),
     path('admin/', admin.site.urls),
     path('v0/', include('v0.urls')),
-    path('silk/', include('silk.urls', namespace='silk'))
+    # path('silk/', include('silk.urls', namespace='silk'))
 ]
