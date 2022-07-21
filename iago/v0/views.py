@@ -608,7 +608,7 @@ class transform(views.APIView):
         return Response({'vectors': embeds}, status=status.HTTP_200_OK)
 
 
-class object_autocomplete(views.APIView):
+class object_search(views.APIView):
     # @silk_profile(name='Model autocomplete')
     def get(self, request: Request):
         try:

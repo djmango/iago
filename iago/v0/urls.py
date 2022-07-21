@@ -17,7 +17,7 @@ urlpatterns = [
     path('content/upload', views.content_file_upload.as_view()),
     path('index/query', views.index_query.as_view()),
     path('index/rebuild', views.index_rebuild.as_view()),
-    path('objects/autocomplete', views.object_autocomplete.as_view()),
+    path('objects/search', views.object_search.as_view()),
     path('objects/<str:model_choice>/<str:name>', views.stringEmbeddingCRUD.as_view()),
     path('objects/<str:model_choice>/all', views.stringEmbeddingListAll.as_view()),
     path('skills/adjacent', views.skills_adjacent.as_view()),
@@ -25,7 +25,7 @@ urlpatterns = [
     path('skills/match', views.skills_match.as_view()),
     path('transform/', views.transform.as_view()),
     # ! deprecated
-    path('models/autocomplete', views.object_autocomplete.as_view()),
+    path('models/autocomplete', views.object_search.as_view()),
     path('skillspace/match_embeds', views.skills_match_embeds.as_view()),
     path('skillspace/adjacent', views.skills_adjacent.as_view()),
     path('skillspace/match', views.skills_match.as_view()),
