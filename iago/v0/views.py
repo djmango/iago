@@ -12,7 +12,6 @@ from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.request import Request
-# from silk.profiling.profiler import silk_profile
 
 from v0 import ai, index, schemas
 from v0.article import updateArticle
@@ -29,8 +28,10 @@ logger.setLevel(LOGGING_LEVEL_MODULE)
 
 class skills_match(views.APIView):
     """ take texts and return their embedding and related skills """
-
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.texts)
         except jsonschema.exceptions.ValidationError as err:
@@ -61,6 +62,9 @@ class skills_match_embeds(views.APIView):
     """ take embeds return their related skills """
 
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.embeds)
         except jsonschema.exceptions.ValidationError as err:
@@ -83,9 +87,11 @@ class skills_match_embeds(views.APIView):
 
 class skills_adjacent(views.APIView):
     """ take embeds return their related skills """
-    # @silk_profile(name='Adjacent skills')
 
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.skills_adjacent)
         except jsonschema.exceptions.ValidationError as err:
@@ -117,14 +123,7 @@ class skills_adjacent(views.APIView):
 class index_rebuild(views.APIView):
     """ rebuild the index """
 
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.index)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        index_choice = str(request.data['index'])
-
+    def put(self, request: Request, index_choice: str):
         if index_choice == 'topic':
             query_index = index.topic_index
         elif index_choice == 'skill':
@@ -145,15 +144,14 @@ class index_rebuild(views.APIView):
 
 class index_query(views.APIView):
 
-    def get(self, request: Request):
+    def post(self, request: Request, index_choice: str):
         try:
-            jsonschema.validate(request.data, schema=schemas.index_query_k)
+            jsonschema.validate(request.data, schema=schemas.query_k_temperature)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         query = str(request.data['query'])
         k = int(request.data['k'])
-        index_choice = str(request.data['index'])
         temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else 0
 
         if index_choice == 'topic':
@@ -184,7 +182,7 @@ class index_query(views.APIView):
 class content_update(views.APIView):
     """ update scraped articles with their medium data """
 
-    def get(self, request: Request):
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.k)
         except jsonschema.exceptions.ValidationError as err:
@@ -244,9 +242,11 @@ class content_file_upload(views.APIView):  # vodafone
 
 class content_via_adjacent_skills(views.APIView):
     """ search for content based on skills """
-    # @silk_profile(name='Adjacent skill content')
 
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
         except jsonschema.exceptions.ValidationError as err:
@@ -254,11 +254,11 @@ class content_via_adjacent_skills(views.APIView):
 
         # required
         query_skills = request.data['skills']
-        content_type = request.data['type']
         k: int = request.data['k']
         # optional
-        length = request.data['length'] if 'length' in request.data else None
-        page: int = request.data['page'] if 'page' in request.data else 0
+        content_type = request.data.get('type')
+        length = request.data.get('length')
+        page: int = request.data.get('page', 0)
 
         # start = time.perf_counter()
         skills = [search_fuzzy_cache(Skill, x)[0].first() for x in query_skills]
@@ -281,14 +281,12 @@ class content_via_adjacent_skills(views.APIView):
 
         # apply filters to content_to_return queryset
         # type filter
-        content_to_return = content_to_return.filter(type__in=content_type)
+        if content_type:
+            content_to_return = content_to_return.filter(type__in=content_type)
 
         # length filter
         if length:
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
-
-        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
-        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
 
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
@@ -317,23 +315,26 @@ class content_via_adjacent_skills(views.APIView):
 
 class content_via_search(views.APIView):
     """ search for content based on skills """
-    # @silk_profile(name='Search content')
 
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_search)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         # required
-        content_type = request.data['type']
         k: int = request.data['k']
         # oneOf
         query_string = request.data.get('searchtext')
         query_skills = request.data.get('skills')
         # optional
-        strict = request.data.get('strict', False)
+        content_type = request.data.get('type')
         length = request.data.get('length')
+        provider = request.data.get('provider')
+        strict = request.data.get('strict', False)
         page: int = request.data.get('page', 0)
 
         content_to_return = Content.objects.none()
@@ -355,15 +356,18 @@ class content_via_search(views.APIView):
                 content_to_return |= Content.objects.filter(skills__in=skills)
 
         # apply filters to content_to_return queryset
+
         # type filter
-        content_to_return = content_to_return.filter(type__in=content_type)
+        if content_type:
+            content_to_return = content_to_return.filter(type__in=content_type)
+
+        # provider filter
+        if provider:
+            content_to_return = content_to_return.filter(provider__in=provider)
 
         # length filter
         if length:
             content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
-
-        # popularity filter - remove anything that has no likes, a quick cheat for basic quality assurance NOTE this only works for medium articles
-        content_to_return = content_to_return.filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=0)))
 
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
@@ -375,10 +379,7 @@ class content_via_search(views.APIView):
 
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
         if query_string:
-            content_ids_to_return_ranked = []
-            for content_id_ranked, score in rankings:
-                if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
-                    content_ids_to_return_ranked.append(content_id_ranked)
+            content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return] # ensure the result passed our filters
         else:
             content_ids_to_return_ranked = content_ids_to_return
 
@@ -402,9 +403,11 @@ class content_via_search(views.APIView):
 
 class content_via_recommendation(views.APIView):
     """ generate recommendations for given a job title and content history """
-    # @silk_profile(name='Recommend content')
 
     def get(self, request: Request):
+        return self.post(request)
+    
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
         except jsonschema.exceptions.ValidationError as err:
@@ -473,10 +476,7 @@ class content_via_recommendation(views.APIView):
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
-        content_ids_to_return_ranked = []
-        for content_id_ranked, score in rankings:
-            if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
-                content_ids_to_return_ranked.append(content_id_ranked)
+        content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return] # ensure the result passed our filters
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
@@ -492,8 +492,64 @@ class content_via_recommendation(views.APIView):
 
         # add the aux data and respond
         resp['matched_job'] = job.name
-        resp['hijacked'] = True  # lol
         return Response(resp, status=status.HTTP_200_OK)
+
+
+class content_via_title(views.APIView):
+    """ get content given a content title using fuzzy search """
+
+    def post(self, request: Request):
+        try:
+            jsonschema.validate(request.data, schema=schemas.content_via_title)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query: str = request.data.get('query')
+        k: int = request.data.get('k')
+        page: int = request.data.get('page', 0)  # default to 0
+
+        # get the closest k content to the query via our fuzzy search
+        content_to_return, rankings = search_fuzzy_cache(Content, query, force_result=True)
+
+        # apply filters
+        content_type = request.data.get('type')
+        length = request.data.get('length')
+        provider = request.data.get('provider')
+        # type filter
+        if content_type:
+            content_to_return = content_to_return.filter(type__in=content_type)
+
+        # length filter
+        if length:
+            content_to_return = content_to_return.filter(content_read_seconds__lte=length[1], content_read_seconds__gte=length[0])
+
+        # provider filter
+        if provider:
+            content_to_return = content_to_return.filter(provider__in=provider)
+
+        # unique filter
+        content_to_return = content_to_return.distinct('uuid')
+
+        # evaluate the queryset and get the ids
+        content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
+
+        # build a ranked list of the content ids from the rankings provided by the fuzzy search, which are already ordered by similarity to the query
+        content_ids_to_return_ranked = [x for x in rankings if x in content_ids_to_return] # ensure the result passed our filters
+
+        # slice the content_ids_to_return_ranked list to get the page we want
+        content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
+
+        # determine if we want to return fields or just uuid
+        fields = request.data.get('fields')
+        if fields and not all(f == 'uuid' for f in fields):
+            content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
+            content_to_return = content_to_return.values(*fields)
+            resp = {'content': content_to_return}
+        else:
+            resp = {'content': content_ids_to_return_ranked}
+
+        return Response(resp, status=status.HTTP_200_OK)
+
 
 # * StringEmbedding Views
 
@@ -510,6 +566,33 @@ class stringEmbeddingListAll(views.APIView):
             return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
 
         return Response([str(x) for x in model.objects.all()], status=status.HTTP_200_OK)
+
+
+class stringEmbeddingSearch(views.APIView):
+    """ search for objects """
+    def post(self, request: Request, model_choice: str):
+        try:
+            jsonschema.validate(request.data, schema=schemas.query_k_similarity)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        k = int(request.data['k'])
+        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
+
+        if model_choice == 'topic':
+            model = Topic
+        elif model_choice == 'skill':
+            model = Skill
+        elif model_choice == 'job':
+            model = Job
+        else:
+            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
+
+        return Response({'results': results_pk}, status=status.HTTP_200_OK)
+
 
 
 class stringEmbeddingCRUD(views.APIView):
@@ -589,9 +672,7 @@ class stringEmbeddingCRUD(views.APIView):
 
 class transform(views.APIView):
     """ transform texts """
-    allowed_groups = {}
-
-    def get(self, request: Request):
+    def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.texts)
         except jsonschema.exceptions.ValidationError as err:
@@ -603,43 +684,14 @@ class transform(views.APIView):
         return Response({'vectors': embeds}, status=status.HTTP_200_OK)
 
 
-class object_search(views.APIView):
-    # @silk_profile(name='Model autocomplete')
-    def get(self, request: Request):
-        try:
-            jsonschema.validate(request.data, schema=schemas.autocomplete)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        query = str(request.data['query'])
-        model_choice = str(request.data['model'])
-        k = int(request.data['k'])
-        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
-
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'content':
-            model = Content
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
-
-        return Response({'results': results_pk}, status=status.HTTP_200_OK)
-
-
 class cache_clear(views.APIView):
     """ clear the cache """
-
     def delete(self, request: Request):
         cache.clear()
         return Response({'response': 'success'}, status=status.HTTP_200_OK)
 
 
 class alive(views.APIView):
+    """ check if the server is alive """
     def get(self, request: Request):
-        return Response('alive', status=status.HTTP_200_OK)
+        return Response('HTTP_209_GOODMORNING', status=status.HTTP_200_OK)

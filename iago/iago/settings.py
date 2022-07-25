@@ -32,24 +32,6 @@ else:
 LOGGING_LEVEL_MODULE = logging.DEBUG if DEBUG else logging.INFO
 ALLOWED_FILES = ['pdf']
 
-# silk profiling
-# SILKY_PYTHON_PROFILER_BINARY = True
-# SILKY_AUTHENTICATION = True  # User must login
-# SILKY_AUTHORISATION = True  # User must have permissions
-# SILKY_MAX_REQUEST_BODY_SIZE = -1  # Silk takes anything <0 as no limit
-# SILKY_MAX_RESPONSE_BODY_SIZE = 1024  # If response body>1024 bytes, ignore
-# SILKY_MAX_RECORDED_REQUESTS = 10 ** 4
-# SILKY_META = True
-# SILKY_ANALYZE_QUERIES = True
-# SILKY_EXPLAIN_FLAGS = {'format':'JSON', 'costs': True}
-# SILKY_PYTHON_PROFILER_RESULT_PATH = BASE_DIR/'.tmp/'
-# os.makedirs(SILKY_PYTHON_PROFILER_RESULT_PATH, exist_ok=True)
-# # silky ignores
-# SILKY_IGNORE_PATHS = ['/alive']
-# def run_silk(request): # WSGI request
-#     return request.headers.get('enable-profiler', False) # if header is set, enable profiler
-# SILKY_PYTHON_PROFILER_FUNC = run_silk
-
 LOGIN_URL = '/admin/login/'
 
 # django host and trust
@@ -70,7 +52,6 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
-    # 'silk',
 ]
 
 if DEBUG:
@@ -78,14 +59,12 @@ if DEBUG:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    # 'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'silk.middleware.SilkyMiddleware',
 ]
 
 # https://docs.djangoproject.com/en/4.0/topics/cache/#database-caching-1
@@ -215,7 +194,6 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 # STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 STATICFILES_STORAGE = 'storages.backends.s3boto3.S3StaticStorage'
 
 # Default primary key field type

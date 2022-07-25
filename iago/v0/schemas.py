@@ -27,28 +27,12 @@ query_k = {
     "required": ["query"],
 }
 
-index = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "index": {
-            "type": "string",
-            "enum": ["topic", "skill", "content", "unsplash", "vodafone"]
-        }
-    },
-    "required": ["index"],
-}
-
-index_query_k = {
+query_k_temperature = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
         "query": {
             "type": "string",
-        },
-        "index": {
-            "type": "string",
-            "enum": ["topic", "skill", "content", "unsplash", "vodafone"]
         },
         "k": {
             "type": "integer",
@@ -60,7 +44,7 @@ index_query_k = {
             "inclusiveMaximum": 100
         }
     },
-    "required": ["query", "index"],
+    "required": ["query"],
 }
 
 texts = {
@@ -78,18 +62,13 @@ texts = {
     "required": ["texts"],
 }
 
-autocomplete = {
+query_k_similarity = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
         "query": {
             "type": "string",
-            "description": "The string to autocomplete"
-        },
-        "model": {
-            "type": "string",
-            "description": "The model type to autocomplete",
-            "enum": ["topic", "skill", "content", "job"]
+            "description": "The string to search for"
         },
         "k": {
             "type": "integer",
@@ -103,7 +82,7 @@ autocomplete = {
             "inclusiveMaximum": 100
         },
     },
-    "required": ["query", "model", "k"],
+    "required": ["query", "k"],
 }
 
 
@@ -136,7 +115,7 @@ skills_adjacent = {
         },
         "k": {
             "type": "integer",
-            "description": "The number of adjacent skills to return per skill.",
+            "description": "The number of adjacent skills to return per skill",
             "exclusiveMinimum": 0
         },
         "temperature": {
@@ -155,11 +134,11 @@ content_via_search = {
     "properties": {
         "searchtext": {
             "type": "string",
-            "description": "The title or skills to search for.",
+            "description": "The title or skills to search for",
         },
         "skills": {
             "type": "array",
-            "description": "The skills to look for in content.",
+            "description": "The skills to look for in content",
             "uniqueItems": True,
             "items": {
                 "type": "string"
@@ -167,16 +146,25 @@ content_via_search = {
         },
         "type": {
             "type": "array",
-            "description": "The types of content to allow in result.",
+            "description": "The types of content to allow in result",
             "uniqueItems": True,
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
             }
         },
+        "provider": {
+            "type": "array",
+            "description": "The providers whos content to allow in result",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": vars(Content.providers)["_member_names_"],
+            }
+        },
         "length": {
             "type": "array",
-            "description": "Min and a max read length in seconds filter.",
+            "description": "Min and a max read length in seconds filter",
             "minItems": 2,
             "maxItems": 2,
             "uniqueItems": True,
@@ -187,21 +175,21 @@ content_via_search = {
         },
         "k": {
             "type": "integer",
-            "description": "The number of content pieces to return.",
+            "description": "The number of content pieces to return",
             "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",
-            "description": "The page to return. Each page has k elements. Defaults to 0.",
+            "description": "The page to return. Each page has k elements. Defaults to 0",
             "inclusiveMinimum": 0
         },
         "strict": {
             "type": "boolean",
-            "description": "If true, only return content that matches ALL skills provided, assuming the skill exists in the database.",
+            "description": "If true, only return content that matches ALL skills provided, assuming the skill exists in the database",
         },
         "fields": {
             "type": "array",
-            "description": "The fields to return.",
+            "description": "The fields to return",
             "uniqueItems": True,
             "items": {
                 "type": "string",
@@ -210,7 +198,7 @@ content_via_search = {
         }
 
     },
-    "required": ["type", "k"],
+    "required": ["k"],
     "oneOf": [
         {"required": ["skills"]},
         {"required": ["searchtext"]}
@@ -224,7 +212,7 @@ content_via_adjacent_skills = {
     "properties": {
         "skills": {
             "type": "array",
-            "description": "The skills to look for in content.",
+            "description": "The skills to look for in content",
             "uniqueItems": True,
             "items": {
                 "type": "string"
@@ -232,16 +220,25 @@ content_via_adjacent_skills = {
         },
         "type": {
             "type": "array",
-            "description": "The types of content to allow in result.",
+            "description": "The types of content to allow in result",
             "uniqueItems": True,
             "items": {
                 "type": "string",
                 "enum": vars(Content.types)["_member_names_"],
             }
         },
+        "provider": {
+            "type": "array",
+            "description": "The providers whos content to allow in result",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": vars(Content.providers)["_member_names_"],
+            }
+        },
         "length": {
             "type": "array",
-            "description": "Min and a max read length in seconds filter.",
+            "description": "Min and a max read length in seconds filter",
             "minItems": 2,
             "maxItems": 2,
             "uniqueItems": True,
@@ -252,17 +249,17 @@ content_via_adjacent_skills = {
         },
         "k": {
             "type": "integer",
-            "description": "The number of content pieces to return.",
+            "description": "The number of content pieces to return",
             "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",
-            "description": "The page to return. Each page has k elements. Defaults to 0.",
+            "description": "The page to return. Each page has k elements. Defaults to 0",
             "inclusiveMinimum": 0
         },
         "fields": {
             "type": "array",
-            "description": "The fields to return.",
+            "description": "The fields to return",
             "uniqueItems": True,
             "items": {
                 "type": "string",
@@ -270,7 +267,7 @@ content_via_adjacent_skills = {
             }
         }
     },
-    "required": ["skills", "type", "k"]
+    "required": ["skills", "k"]
 }
 
 content_via_recommendation = {
@@ -279,36 +276,36 @@ content_via_recommendation = {
     "properties": {
         "title": {
             "type": "string",
-            "description": "A free-form job title.",
+            "description": "A free-form job title",
         },
         "position": {
             "type": "string",
-            "description": "A free-form job position.",
+            "description": "A free-form job position",
         },
         "lastconsumedcontent": {
             "type": "array",
-            "description": "The content pieces that the user has consumed.",
+            "description": "The content pieces that the user has consumed",
             "uniqueItems": True,
             # "minItems": 1, i guess we have to keep these valid because i keep getting empty requests - will handle it on iago side, send random recommendation idk
             "items": {
                 "type": "string",
-                "description": "The unique identifier for a content piece.",
+                "description": "The unique identifier for a content piece",
                 "format": "uuid"
             }
         },
         "k": {
             "type": "integer",
-            "description": "The number of recommendations to return.",
+            "description": "The number of recommendations to return",
             "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",
-            "description": "The page to return. Each page has k elements. Defaults to 0.",
+            "description": "The page to return. Each page has k elements. Defaults to 0",
             "inclusiveMinimum": 0
         },
         "type": {
             "type": "array",
-            "description": "The types of content to allow in result.",
+            "description": "The types of content to allow in result",
             "uniqueItems": True,
             "items": {
                 "type": "string",
@@ -317,7 +314,7 @@ content_via_recommendation = {
         },
         "provider": {
             "type": "array",
-            "description": "The providers to allow in result.",
+            "description": "The providers to allow in result",
             "items": {
                 "type": "string",
                 "enum": vars(Content.providers)["_member_names_"],
@@ -325,7 +322,7 @@ content_via_recommendation = {
         },
         "length": {
             "type": "array",
-            "description": "Min and a max read length in seconds filter.",
+            "description": "Min and a max read length in seconds filter",
             "minItems": 2,
             "maxItems": 2,
             "uniqueItems": True,
@@ -336,7 +333,7 @@ content_via_recommendation = {
         },
         "weights": {
             "type": "array",
-            "description": "The weight of the position and the content history. For example, provided [0.5, 1] means content history is twice as heavy as position in the recomendation.",
+            "description": "The weight of the position and the content history. For example, provided [0.5, 1] means content history is twice as heavy as position in the recomendation",
             "items": {
                 "type": "number",
                 "inclusiveMinimum": 0,
@@ -351,7 +348,7 @@ content_via_recommendation = {
         },
         "fields": {
             "type": "array",
-            "description": "The fields to return.",
+            "description": "The fields to return",
             "uniqueItems": True,
             "items": {
                 "type": "string",
@@ -359,5 +356,71 @@ content_via_recommendation = {
             }
         }
     },
-    "required": ["position", "lastconsumedcontent", "k"]
+    "required": ["k"],
+    "anyOf": [
+        {"required": ["position"]},
+        {"required": ["lastconsumedcontent"]}
+    ]
+}
+
+
+content_via_title = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "query": {
+            "type": "string",
+            "description": "The content title to search for",
+        },
+        "type": {
+            "type": "array",
+            "description": "The types of content to allow in result",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": vars(Content.types)["_member_names_"],
+            }
+        },
+        "provider": {
+            "type": "array",
+            "description": "The providers whos content to allow in result",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": vars(Content.providers)["_member_names_"],
+            }
+        },
+        "length": {
+            "type": "array",
+            "description": "Min and a max read length in seconds filter",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": True,
+            "items": {
+                "type": "integer",
+                "inclusiveMinimum": 0
+            }
+        },
+        "k": {
+            "type": "integer",
+            "description": "The number of content pieces to return",
+            "exclusiveMinimum": 0
+        },
+        "page": {
+            "type": "integer",
+            "description": "The page to return. Each page has k elements. Defaults to 0",
+            "inclusiveMinimum": 0
+        },
+        "fields": {
+            "type": "array",
+            "description": "The fields to return",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+                "enum": [x.name for x in Content._meta.get_fields()],
+            }
+        }
+
+    },
+    "required": ["query", "k"],
 }

@@ -14,4 +14,3 @@ sentence-transformers~=2.1.0
 torch
 transformers~=4.20.1
 twisted[tls,http2]
-git+https://github.com/djmango/django-silk.git@ee0812e680c17b66d5458c2338d4969e1aa6761a
