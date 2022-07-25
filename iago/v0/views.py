@@ -570,6 +570,9 @@ class stringEmbeddingListAll(views.APIView):
 
 class stringEmbeddingSearch(views.APIView):
     """ search for objects """
+    def get(self, request: Request):
+        return self.post(request)
+
     def post(self, request: Request, model_choice: str):
         try:
             jsonschema.validate(request.data, schema=schemas.query_k_similarity)
