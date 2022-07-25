@@ -84,6 +84,7 @@ class skills_match_embeds(views.APIView):
 class skills_adjacent(views.APIView):
     """ take embeds return their related skills """
     # @silk_profile(name='Adjacent skills')
+
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.skills_adjacent)
@@ -244,6 +245,7 @@ class content_file_upload(views.APIView):  # vodafone
 class content_via_adjacent_skills(views.APIView):
     """ search for content based on skills """
     # @silk_profile(name='Adjacent skill content')
+
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
@@ -316,6 +318,7 @@ class content_via_adjacent_skills(views.APIView):
 class content_via_search(views.APIView):
     """ search for content based on skills """
     # @silk_profile(name='Search content')
+
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_search)
@@ -400,6 +403,7 @@ class content_via_search(views.APIView):
 class content_via_recommendation(views.APIView):
     """ generate recommendations for given a job title and content history """
     # @silk_profile(name='Recommend content')
+
     def get(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
@@ -409,8 +413,8 @@ class content_via_recommendation(views.APIView):
         # first match the free-form job title provided to one embedded in our database
         position: str = request.data['position']
         job: Job = search_fuzzy_cache(Job, position, force_result=True)[0].first()
-        # if job is None:
-        #     return Response({'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
+        if job is None:
+            return Response({'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
 
         # next get content objects with the provided content history ids
         content_history: list[Content] = []
@@ -424,30 +428,25 @@ class content_via_recommendation(views.APIView):
             else:
                 return Response({'response': f'Invalid UUID {content_id}', 'content': []}, status=status.HTTP_400_BAD_REQUEST)
 
-        # NOTE just for debugging purposes, force if we have an empty list
+        # we can only generate a content history embedding center if we actually have a history
         if len(content_history) == 0:
-            content_history = [Content.objects.get(uuid="7be2638d-4baf-4089-b300-cf4c34c6a203")]
-            logger.warning('Empty content history, forcing content_history to 7be2638d-4baf-4089-b300-cf4c34c6a203')
+            # now get the center of the content history embeddings
+            content_history_vectors = np.array([x.embedding_all_mpnet_base_v2 for x in content_history]).astype(np.float32)
+            content_history_center = np.average(content_history_vectors, axis=0)
 
-        # now get the center of the content history embeddings
-        content_history_vectors = np.array([x.embedding_all_mpnet_base_v2 for x in content_history]).astype(np.float32)
-        content_history_center = np.average(content_history_vectors, axis=0)
-
-        # get the weights of job and history and compute the center of the recomendation in the embedding space
-        job_weight, history_weight = request.data.get('weights', [1, 1])  # default to equal weights
-        recomendation_center = np.average([np.array(job.embedding_all_mpnet_base_v2), content_history_center], axis=0, weights=[job_weight, history_weight])
+            # get the weights of job and history and compute the center of the recomendation in the embedding space
+            job_weight, history_weight = request.data.get('weights', (1, 1))  # default to equal weights
+            recomendation_center = np.average([np.array(job.embedding_all_mpnet_base_v2), content_history_center], axis=0, weights=[job_weight, history_weight])
+        else:  # otherwise we can just use the job embedding
+            recomendation_center = np.array(job.embedding_all_mpnet_base_v2)
 
         # now get the closest k content to the recomendation center via our faiss index
         k: int = request.data['k']
         page: int = request.data.get('page', 0)  # default to 0
         temperature = float(request.data.get('temperature', 0)/100)  # default to 0
-        p = 10 if temperature == 0 else 1  # # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
+        p = 10 if temperature == 0 else 1  # if temp is 0 we want to multiply k because it wont get multiplied by p within the query method
 
-        # NOTE okay new hijack, we will now recommend a single piece of vodafone content, and then match the remaining content to that vodafone content, this is still a hijack yes
-        vodafone_results, vodafone_rankings, query_vector = index.vodafone_index.query(recomendation_center, k=1)
-
-        results, rankings, query_vector = index.content_index.query(vodafone_results[0].embedding_all_mpnet_base_v2, k=k*p*(page+1), min_distance=temperature, truncate_results=False)
-        # results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+1), min_distance=temperature, truncate_results=False)
+        results, rankings, query_vector = index.content_index.query(recomendation_center, k=k*(page+1), min_distance=temperature, truncate_results=False)
 
         content_to_return = results
 
@@ -478,10 +477,6 @@ class content_via_recommendation(views.APIView):
         for content_id_ranked, score in rankings:
             if content_id_ranked in content_ids_to_return:  # ensure the result passed our filters
                 content_ids_to_return_ranked.append(content_id_ranked)
-
-        # NOTE hijacking this to demo vodafone content
-        vodafone_content_id = vodafone_rankings[0][0]
-        content_ids_to_return_ranked.insert(0, vodafone_content_id)
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
