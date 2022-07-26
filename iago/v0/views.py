@@ -6,7 +6,7 @@ from multiprocessing.pool import ThreadPool
 import jsonschema
 import numpy as np
 from django.core.cache import cache
-from django.db.models import Q
+from django.db import models
 from iago.settings import DEBUG, LOGGING_LEVEL_MODULE
 from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -15,7 +15,7 @@ from rest_framework.request import Request
 
 from v0 import ai, index, schemas
 from v0.article import updateArticle
-from v0.models import Content, Job, Skill, Topic
+from v0.models import Content, Job, Skill, Topic, HUMAN_TO_MODEL
 from v0.pdf import ingestContentPDF
 from v0.serializers import fileUploadSerializer
 from v0.utils import allowedFile, is_valid_uuid, search_fuzzy_cache
@@ -28,9 +28,10 @@ logger.setLevel(LOGGING_LEVEL_MODULE)
 
 class skills_match(views.APIView):
     """ take texts and return their embedding and related skills """
+
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.texts)
@@ -63,7 +64,7 @@ class skills_match_embeds(views.APIView):
 
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.embeds)
@@ -90,7 +91,7 @@ class skills_adjacent(views.APIView):
 
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.skills_adjacent)
@@ -245,7 +246,7 @@ class content_via_adjacent_skills(views.APIView):
 
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
@@ -318,7 +319,7 @@ class content_via_search(views.APIView):
 
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_search)
@@ -379,7 +380,7 @@ class content_via_search(views.APIView):
 
         # build a ranked list of the content from the rankings provided by the indexer, which are already ordered by similarity
         if query_string:
-            content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return] # ensure the result passed our filters
+            content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return]  # ensure the result passed our filters
         else:
             content_ids_to_return_ranked = content_ids_to_return
 
@@ -406,7 +407,7 @@ class content_via_recommendation(views.APIView):
 
     def get(self, request: Request):
         return self.post(request)
-    
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
@@ -476,7 +477,7 @@ class content_via_recommendation(views.APIView):
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
-        content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return] # ensure the result passed our filters
+        content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return]  # ensure the result passed our filters
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
@@ -534,7 +535,7 @@ class content_via_title(views.APIView):
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         # build a ranked list of the content ids from the rankings provided by the fuzzy search, which are already ordered by similarity to the query
-        content_ids_to_return_ranked = [x for x in rankings if x in content_ids_to_return] # ensure the result passed our filters
+        content_ids_to_return_ranked = [x for x in rankings if x in content_ids_to_return]  # ensure the result passed our filters
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
@@ -556,61 +557,24 @@ class content_via_title(views.APIView):
 
 class stringEmbeddingListAll(views.APIView):
     def get(self, request: Request, model_choice: str):
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+        # validate and get model
+        model_choices_valid = ['topic', 'skill', 'job']
+        if model_choice not in model_choices_valid:
+            return Response(f'{model_choice} is not a valid model: {model_choices_valid}', status=status.HTTP_404_NOT_FOUND)
+        model: models.Model = HUMAN_TO_MODEL[model_choice]
 
         return Response([str(x) for x in model.objects.all()], status=status.HTTP_200_OK)
-
-
-class stringEmbeddingSearch(views.APIView):
-    """ search for objects """
-    def get(self, request: Request, model_choice: str):
-        return self.post(request, model_choice)
-
-    def post(self, request: Request, model_choice: str):
-        try:
-            jsonschema.validate(request.data, schema=schemas.query_k_similarity)
-        except jsonschema.exceptions.ValidationError as err:
-            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
-
-        query = str(request.data['query'])
-        k = int(request.data['k'])
-        similarity_minimum = float(request.data['similarity_minimum']/100) if 'similarity_minimum' in request.data else 0.3
-
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # TODO add dynamic field retrieval and validation and make this work for all models
-        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
-
-        return Response({'results': results_pk}, status=status.HTTP_200_OK)
-
 
 
 class stringEmbeddingCRUD(views.APIView):
     """ CRUD for specified object and instance """
 
     def get(self, request: Request, model_choice: str, name: str):
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+        # validate and get model # TODO make this block a function
+        model_choices_valid = ['topic', 'skill', 'job']
+        if model_choice not in model_choices_valid:
+            return Response(f'{model_choice} is not a valid model: {model_choices_valid}', status=status.HTTP_404_NOT_FOUND)
+        model: models.Model = HUMAN_TO_MODEL[model_choice]
 
         if model.objects.filter(name=name).count() > 0:
             return Response(model.objects.filter(name=name).values()[0], status=status.HTTP_200_OK)
@@ -618,14 +582,11 @@ class stringEmbeddingCRUD(views.APIView):
             return Response({'response': f'{model_choice} {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request: Request, model_choice: str, name: str):
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+        # validate and get model
+        model_choices_valid = ['topic', 'skill', 'job']
+        if model_choice not in model_choices_valid:
+            return Response(f'{model_choice} is not a valid model: {model_choices_valid}', status=status.HTTP_404_NOT_FOUND)
+        model: models.Model = HUMAN_TO_MODEL[model_choice]
 
         if model.objects.filter(name=name).count() > 0:
             return Response({'response': f'{model_choice} {name} already exists'}, status=status.HTTP_302_FOUND)
@@ -646,14 +607,11 @@ class stringEmbeddingCRUD(views.APIView):
             return Response({'response': f'{name} created'}, status=status.HTTP_201_CREATED)
 
     def delete(self, request: Request, model_choice: str, name: str):
-        if model_choice == 'topic':
-            model = Topic
-        elif model_choice == 'skill':
-            model = Skill
-        elif model_choice == 'job':
-            model = Job
-        else:
-            return Response(f'{model_choice} is not a valid model: [topic, skill, job]', status=status.HTTP_404_NOT_FOUND)
+        # validate and get model
+        model_choices_valid = ['topic', 'skill', 'job']
+        if model_choice not in model_choices_valid:
+            return Response(f'{model_choice} is not a valid model: {model_choices_valid}', status=status.HTTP_404_NOT_FOUND)
+        model: models.Model = HUMAN_TO_MODEL[model_choice]
 
         if model.objects.filter(name=name).count() > 0:
             model.objects.get(name=name).delete()
@@ -671,11 +629,71 @@ class stringEmbeddingCRUD(views.APIView):
         else:
             return Response({'response': f'{model_choice} {name} not found'}, status=status.HTTP_404_NOT_FOUND)
 
+
+# * Generic Model Views
+
+class model_field_search(views.APIView):
+    """ search for objects """
+
+    def get(self, request: Request, model_choice: str):
+        return self.post(request, model_choice)
+
+    def post(self, request: Request, model_choice: str):
+        try:
+            jsonschema.validate(request.data, schema=schemas.model_field_search)
+        except jsonschema.exceptions.ValidationError as err:
+            return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
+
+        query = str(request.data['query'])
+        k = int(request.data['k'])
+        similarity_minimum = float(request.data.get('similarity_minimum', 30)/100)
+
+        model: models.Model = HUMAN_TO_MODEL[model_choice]
+        model_fields = ['pk'] + [x.name for x in model._meta.get_fields()]
+
+        # validate requested return fields
+        fields = request.data.get('fields', ['pk'])  # default to just pk returned
+        if any(x not in model_fields for x in fields):
+            return Response(f'{model_choice} does not have the following fields: {[x for x in fields if x not in model_fields]}', status=status.HTTP_400_BAD_REQUEST)
+
+        # get search field string or default
+        search_field = request.data.get('search_field')
+        if not search_field:  # defaults are per model
+            if model == Content:
+                search_field = 'title'
+            else:
+                search_field = 'name' # ? make this the pk by default?
+
+        # validate search field is in model
+        if search_field not in model_fields:
+            return Response(f'{model_choice} does not have field: {search_field}', status=status.HTTP_400_BAD_REQUEST)
+
+        # validate search field is of correct type
+        if search_field == 'pk':
+            search_field_type = type(model._meta.pk)
+        else:
+            search_field_type = type(model._meta.get_field(search_field))
+        if search_field_type not in [models.CharField, models.TextField]:
+            return Response(f'{model_choice} field {search_field} is not a string field', status=status.HTTP_400_BAD_REQUEST)
+
+        # perform the search
+        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum, search_field=search_field)
+
+        # finally get the fields we want
+        if len(fields) == 1:
+            results_to_return = results_pk
+        else:
+            results_to_return = results.values(*fields)
+
+        return Response({'results': results_to_return}, status=status.HTTP_200_OK)
+
+
 # * Utility Views
 
 
 class transform(views.APIView):
     """ transform texts """
+
     def post(self, request: Request):
         try:
             jsonschema.validate(request.data, schema=schemas.texts)
@@ -690,6 +708,7 @@ class transform(views.APIView):
 
 class cache_clear(views.APIView):
     """ clear the cache """
+
     def delete(self, request: Request):
         cache.clear()
         return Response({'response': 'success'}, status=status.HTTP_200_OK)
@@ -697,5 +716,6 @@ class cache_clear(views.APIView):
 
 class alive(views.APIView):
     """ check if the server is alive """
+
     def get(self, request: Request):
         return Response('HTTP_209_GOODMORNING', status=status.HTTP_200_OK)

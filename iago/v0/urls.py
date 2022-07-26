@@ -19,7 +19,7 @@ urlpatterns = [
     path('index/<str:index_choice>/rebuild', views.index_rebuild.as_view()),
     path('objects/content/search', views.content_via_title.as_view()),
     path('objects/<str:model_choice>/all', views.stringEmbeddingListAll.as_view()),
-    path('objects/<str:model_choice>/search', views.stringEmbeddingSearch.as_view()),
+    path('objects/<str:model_choice>/search', views.model_field_search.as_view()),
     path('objects/<str:model_choice>/<str:name>', views.stringEmbeddingCRUD.as_view()),
     path('skills/adjacent', views.skills_adjacent.as_view()),
     path('skills/match_embeds', views.skills_match_embeds.as_view()),

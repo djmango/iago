@@ -34,7 +34,6 @@ class GenericStringEmbedding(StringEmbedding):
     """ Uncategorized generic string and embedding pair - used primarily as a persistent cache of embeddings """
     id = models.BigAutoField(primary_key=True)
     name = models.TextField(editable=False)
-    pass
 
 
 class Topic(StringEmbedding):
@@ -216,3 +215,14 @@ class Content(models.Model):
 
     def __str__(self):
         return str(self.title)
+
+# human-readable string to model class
+HUMAN_TO_MODEL = {
+    'content': Content,
+    'Job': Job,
+    'skill': Skill,
+    'topic': Topic,
+    'unsplash': UnsplashPhoto,
+    'mindtools_group': MindtoolsSkillGroup,
+    'mindtools_subgroup': MindtoolsSkillSubgroup,
+}

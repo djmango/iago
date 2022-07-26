@@ -62,7 +62,7 @@ texts = {
     "required": ["texts"],
 }
 
-query_k_similarity = {
+model_field_search = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
@@ -81,6 +81,18 @@ query_k_similarity = {
             "exclusiveMinimum": 0,
             "inclusiveMaximum": 100
         },
+        "fields": {
+            "type": "array",
+            "description": "The fields to return",
+            "uniqueItems": True,
+            "items": {
+                "type": "string",
+            }
+        },
+        "search_field": {
+            "type": "string",
+            "description": "The field to search in"
+        }
     },
     "required": ["query", "k"],
 }

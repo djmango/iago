@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 os.makedirs(HERE/'models', exist_ok=True)
 
 
-class Model():
+class TransformerModel():
     """ simple handler for sentence_transformers models """
 
     def __init__(self, name: str, max_seq_length: int):
@@ -35,6 +35,11 @@ class Model():
     def encode(self, strings: list[str], use_cache=True, show_progress_bar=False):
         """ gets embeds from strings from cache if availablbe, else embeds strings and saves to cache and returns """
         start = time.perf_counter()
+
+        # validate that we can use cache - GenericStringEmbedding uses charfield so thats max 255 chars
+        if use_cache and any(len(x) > 255 for x in strings): 
+            use_cache = False
+            logger.warning('Cannot use cache for strings with more than 255 chars')
 
         # first get what we can from cache and build a list of ones we still need to embed
         cache = []
@@ -70,7 +75,7 @@ class Model():
 
 
 # define embedding model
-embedding_model = Model('all-mpnet-base-v2', max_seq_length=384)
+embedding_model = TransformerModel('all-mpnet-base-v2', max_seq_length=384)
 
 # summarizer model
 
