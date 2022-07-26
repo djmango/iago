@@ -570,8 +570,8 @@ class stringEmbeddingListAll(views.APIView):
 
 class stringEmbeddingSearch(views.APIView):
     """ search for objects """
-    def get(self, request: Request):
-        return self.post(request)
+    def get(self, request: Request, model_choice: str):
+        return self.post(request, model_choice)
 
     def post(self, request: Request, model_choice: str):
         try:
