@@ -432,7 +432,7 @@ class content_via_recommendation(views.APIView):
                 return Response({'response': f'Invalid UUID {content_id}', 'content': []}, status=status.HTTP_400_BAD_REQUEST)
 
         # we can only generate a content history embedding center if we actually have a history
-        if len(content_history) == 0:
+        if not len(content_history) == 0:
             # now get the center of the content history embeddings
             content_history_vectors = np.array([x.embedding_all_mpnet_base_v2 for x in content_history]).astype(np.float32)
             content_history_center = np.average(content_history_vectors, axis=0)
@@ -592,6 +592,7 @@ class stringEmbeddingSearch(views.APIView):
         else:
             return Response({'response': f'invalid model {model_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # TODO add dynamic field retrieval and validation and make this work for all models
         results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum)
 
         return Response({'results': results_pk}, status=status.HTTP_200_OK)

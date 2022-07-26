@@ -239,7 +239,7 @@ def generate_cache_key(*args, **kwargs):
     return str(get_hash((args, kwargs)).hex())
 
 
-def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False, field_name='name'):
+def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False, field_name='pk'):
     """ Gets closest queryset object to the given name
 
     Args:
