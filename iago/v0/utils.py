@@ -257,7 +257,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
 
     # check if available in cache first
     start = time.perf_counter()
-    cache_key = generate_cache_key(str(model._meta).lower(), name, k, similarity_minimum, search_field, version=2)  # change version every time you modify this line
+    cache_key = generate_cache_key(str(model._meta).lower(), name, k, similarity_minimum, force_result, search_field, version=3)  # change version every time you modify this line
     cached_results = cache.get(cache_key)
     if use_cached and cached_results and type(cached_results) == tuple:  # if so do a simple pk lookup
         results, results_pk = cached_results  # unpack tuple
@@ -270,7 +270,7 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         results = model.objects.filter(pk__in=results_pk)
         cache.set(cache_key, (results, results_pk), timeout=60*60*24*2)  # 2 day timeout
 
-    if len(results_pk) == 0 and force_result:  # if we want to force a result, reduce the similarity minimum and call self again
-        return search_fuzzy_cache(model, name, k, similarity_minimum*0.7, use_cached=use_cached, force_result=True)
+    if len(results_pk) < k and force_result:  # if we want to force a result, reduce the similarity minimum and call self again
+        return search_fuzzy_cache(model, name, k, similarity_minimum*0.7, use_cached=use_cached, force_result=True, search_field=search_field)
 
     return results, results_pk

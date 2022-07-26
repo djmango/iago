@@ -510,7 +510,7 @@ class content_via_title(views.APIView):
         page: int = request.data.get('page', 0)  # default to 0
 
         # get the closest k content to the query via our fuzzy search
-        content_to_return, rankings = search_fuzzy_cache(Content, query, force_result=True)
+        content_to_return, rankings = search_fuzzy_cache(Content, query, k=int(k*(page+1)), force_result=True, search_field='title')
 
         # apply filters
         content_type = request.data.get('type')
