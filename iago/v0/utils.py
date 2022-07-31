@@ -255,6 +255,8 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         List: Pks of closest matched instances ordered by similarity
     """
 
+    # TODO make option to pass in a queryset to allow for pre filtering
+
     # check if available in cache first
     start = time.perf_counter()
     cache_key = generate_cache_key(str(model._meta).lower(), name, k, similarity_minimum, force_result, search_field, version=3)  # change version every time you modify this line

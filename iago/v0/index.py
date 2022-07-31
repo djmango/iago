@@ -5,7 +5,7 @@ from pathlib import Path
 import faiss
 import numpy as np
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Q, Model
 from django.db.models.query import QuerySet
 from iago.settings import DEBUG
 from sentence_transformers import util
@@ -23,6 +23,7 @@ class VectorIndex():
 
     def __init__(self, iterable: QuerySet):
         self.iterable = iterable
+        self.model: Model = iterable.model
         if type(iterable) == QuerySet:
             self.logger = logging.getLogger(f'v0.VectorIndex_{self.iterable.model.__name__}')
         else:
@@ -161,4 +162,4 @@ if not DEBUG or False: # set to true to enable indexes in debug
     unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
     vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))
     skills_index = VectorIndex(Skill.objects.all())
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200)))) # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
+content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200)))) # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db

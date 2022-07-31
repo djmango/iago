@@ -147,13 +147,14 @@ class index_query(views.APIView):
 
     def post(self, request: Request, index_choice: str):
         try:
-            jsonschema.validate(request.data, schema=schemas.query_k_temperature)
+            jsonschema.validate(request.data, schema=schemas.query_k_temperature_fields)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
         query = str(request.data['query'])
         k = int(request.data['k'])
-        temperature = float(request.data['temperature'])/100 if 'temperature' in request.data else 0
+        temperature = float(request.data.get('temperature', 0)/100)  # default to 0
+        page: int = request.data.get('page', 0)
 
         if index_choice == 'topic':
             query_index = index.topic_index
@@ -168,14 +169,32 @@ class index_query(views.APIView):
         else:
             return Response({'response': f'invalid index {index_choice}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        results, rankings, query_vector = query_index.query(query, k, temperature)
+        # get model and fields
+        model = query_index.model
+        model_fields = ['pk'] + [x.name for x in model._meta.get_fields()]
 
-        results_pk = results.values_list('pk', flat=True)
-        results_ranked = []
-        for pk, score in rankings[:k]:
-            results_ranked.append(results.filter(pk=pk).values().first())
+        # validate requested return fields
+        fields = request.data.get('fields', ['pk'])  # default to just pk returned
+        if any(x not in model_fields for x in fields):
+            return Response(f'{model} does not have the following fields: {[x for x in fields if x not in model_fields]}', status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'results': results_ranked, 'query_vector': query_vector, 'results_pk': results_pk}, status=status.HTTP_200_OK)
+        if not 'pk' in fields: # must return pk to do the ranking later
+            fields.append('pk')
+
+        # do the actual search
+        results, rankings, query_vector = query_index.query(query, k*(page+1), temperature)
+        
+        results_pk_to_return_ranked = [x for x, score in rankings[page*k:(page+1)*k]]
+
+        # finally get the fields from the results that we want
+        if fields == ['pk']: # no need to hit the db again if we just want the pks, also makes it so we dont need to rerank
+            results_to_return = results_pk_to_return_ranked
+        else: # otherwise return a list of dicts if we want multiple fields. means we also need to rank the results of the queryset since the database hit is unordered
+            results_to_return = list(results.values(*fields))
+            # sort based on ranking
+            results_to_return = sorted(results_to_return, key=lambda result: results_pk_to_return_ranked.index(result['pk'])) 
+
+        return Response({'results': results_to_return, 'query_vector': query_vector}, status=status.HTTP_200_OK)
 
 # * Content Views
 
@@ -280,7 +299,7 @@ class content_via_adjacent_skills(views.APIView):
         # skills tag search
         content_to_return = Content.objects.filter(skills__in=adjacent_skills)
 
-        # apply filters to content_to_return queryset
+        # apply filters to results_to_return queryset
         # type filter
         if content_type:
             content_to_return = content_to_return.filter(type__in=content_type)
@@ -302,7 +321,7 @@ class content_via_adjacent_skills(views.APIView):
 
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
-        if fields and not all(f == 'uuid' for f in fields):
+        if fields:
             content_to_return = Content.objects.filter(uuid__in=content_to_return_ids)
             content_to_return = content_to_return.values(*fields)
             resp = {'content': content_to_return}
@@ -389,9 +408,12 @@ class content_via_search(views.APIView):
 
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
-        if fields and not all(f == 'uuid' for f in fields):
+        if fields:
+            if not 'pk' in fields:
+                fields.append('pk')
             content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
-            content_to_return = content_to_return.values(*fields)
+            content_to_return = list(content_to_return.values(*fields))
+            content_to_return = sorted(content_to_return, key=lambda result: content_ids_to_return_ranked.index(result['pk'])) 
             resp = {'content': content_to_return}
         else:
             resp = {'content': content_ids_to_return_ranked}
@@ -484,9 +506,12 @@ class content_via_recommendation(views.APIView):
 
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
-        if fields and not all(f == 'uuid' for f in fields):
+        if fields:
+            if not 'pk' in fields:
+                fields.append('pk')
             content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
-            content_to_return = content_to_return.values(*fields)
+            content_to_return = list(content_to_return.values(*fields))
+            content_to_return = sorted(content_to_return, key=lambda result: content_ids_to_return_ranked.index(result['pk'])) 
             resp = {'content': content_to_return}
         else:
             resp = {'content': content_ids_to_return_ranked}
@@ -542,9 +567,12 @@ class content_via_title(views.APIView):
 
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
-        if fields and not all(f == 'uuid' for f in fields):
+        if fields:
+            if not 'pk' in fields:
+                fields.append('pk')
             content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
-            content_to_return = content_to_return.values(*fields)
+            content_to_return = list(content_to_return.values(*fields))
+            content_to_return = sorted(content_to_return, key=lambda result: content_ids_to_return_ranked.index(result['pk'])) 
             resp = {'content': content_to_return}
         else:
             resp = {'content': content_ids_to_return_ranked}
@@ -680,9 +708,11 @@ class model_field_search(views.APIView):
         results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum, search_field=search_field)
 
         # finally get the fields we want
-        if len(fields) == 1:
+        if fields == ['pk']: # no need to hit the db again if we just want the pks
             results_to_return = results_pk
-        else:
+        elif len(fields) == 1: # return a flat list of values if we only want one field
+            results_to_return = results.values_list(fields[0], flat=True)
+        else: # otherwise return a list of dicts if we want multiple fields
             results_to_return = results.values(*fields)
 
         return Response({'results': results_to_return}, status=status.HTTP_200_OK)

@@ -47,19 +47,32 @@ query_k_temperature = {
     "required": ["query"],
 }
 
-texts = {
+query_k_temperature_fields = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
-        "texts": {
+        "query": {
+            "type": "string",
+        },
+        "k": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+        },
+        "temperature": {
+            "type": "integer",
+            "inclusiveMinimum": 0,
+            "inclusiveMaximum": 100
+        },
+        "fields": {
             "type": "array",
+            "description": "The fields to return",
             "uniqueItems": True,
             "items": {
-                "type": "string"
+                "type": "string",
             }
         }
     },
-    "required": ["texts"],
+    "required": ["query"],
 }
 
 model_field_search = {
@@ -97,6 +110,21 @@ model_field_search = {
     "required": ["query", "k"],
 }
 
+
+texts = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "texts": {
+            "type": "array",
+            "uniqueItems": True,
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": ["texts"],
+}
 
 embeds = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -205,7 +233,7 @@ content_via_search = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": [x.name for x in Content._meta.get_fields()],
+                "enum": ['pk'] + [x.name for x in Content._meta.get_fields()],
             }
         }
 
@@ -275,7 +303,7 @@ content_via_adjacent_skills = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": [x.name for x in Content._meta.get_fields()],
+                "enum": ['pk'] + [x.name for x in Content._meta.get_fields()],
             }
         }
     },
@@ -288,11 +316,11 @@ content_via_recommendation = {
     "properties": {
         "title": {
             "type": "string",
-            "description": "A free-form job title",
+            "description": "A free-form job title. No impact to the result at the moment",
         },
         "position": {
             "type": "string",
-            "description": "A free-form job position",
+            "description": "A free-form job position, gets matched to a job from Iago's database",
         },
         "lastconsumedcontent": {
             "type": "array",
@@ -364,7 +392,7 @@ content_via_recommendation = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": [x.name for x in Content._meta.get_fields()],
+                "enum": ['pk'] + [x.name for x in Content._meta.get_fields()],
             }
         }
     },
@@ -429,7 +457,7 @@ content_via_title = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": [x.name for x in Content._meta.get_fields()],
+                "enum": ['pk'] + [x.name for x in Content._meta.get_fields()],
             }
         }
 
