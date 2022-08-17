@@ -291,9 +291,12 @@ class content_via_adjacent_skills(views.APIView):
             if skill is not None:
                 # get adjacent skills for our skill
                 results, rankings, query_vector = index.skills_index.query(skill.embedding_all_mpnet_base_v2, k=5)
-                skills_ranked = list(zip(*rankings))[0]  # get the first element of each name, value (rank) pair and make a list
+                # unpack the rankings and make a ranked list of pks and a ranked list of scores
+                unpacked = list(zip(*rankings))
+                skills_ranked = unpacked[0]
+                scores_ranked = unpacked[1]
 
-                adjacent_skills_dict.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:]})
+                adjacent_skills_dict.append({'name': skill.name, 'original': skill_name, 'adjacent': skills_ranked[1:], 'scores': scores_ranked[1:]})
                 adjacent_skills.extend(skills_ranked[1:])
 
         # skills tag search
@@ -500,18 +503,22 @@ class content_via_recommendation(views.APIView):
 
         # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
         content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return]  # ensure the result passed our filters
+        scores = [score for x, score in rankings if x in content_ids_to_return]  # get the scores for the content ids to return
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]
 
         # determine if we want to return fields or just uuid
         fields = request.data.get('fields')
-        if fields:
+        if fields: # TODO: validate the fields dynamically, already wrote the code just have to port it here i think its in object search
             if not 'pk' in fields:
                 fields.append('pk')
             content_to_return = Content.objects.filter(uuid__in=content_ids_to_return_ranked)
             content_to_return = list(content_to_return.values(*fields))
-            content_to_return = sorted(content_to_return, key=lambda result: content_ids_to_return_ranked.index(result['pk'])) 
+            content_to_return = sorted(content_to_return, key=lambda result: content_ids_to_return_ranked.index(result['pk']))
+            # annotate the content with the score
+            for i, content in enumerate(content_to_return):
+                content['score'] = scores[i]
             resp = {'content': content_to_return}
         else:
             resp = {'content': content_ids_to_return_ranked}

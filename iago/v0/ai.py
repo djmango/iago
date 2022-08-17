@@ -37,7 +37,7 @@ class TransformerModel():
         start = time.perf_counter()
 
         # validate that we can use cache - GenericStringEmbedding uses charfield so thats max 255 chars
-        if use_cache and any(len(x) > 255 for x in strings): 
+        if use_cache and any(len(x) > 255 for x in strings):
             use_cache = False
             logger.warning('Cannot use cache for strings with more than 255 chars')
 
@@ -58,7 +58,7 @@ class TransformerModel():
             new_embeds = self.model.encode(uncached_strings, show_progress_bar=show_progress_bar)
             for i, string in enumerate(uncached_strings):
                 new_cache.append(GenericStringEmbedding().create(string, new_embeds[i]))
-            
+
             if use_cache:
                 GenericStringEmbedding.objects.bulk_create(new_cache)
             logger.info(f'Finished embedding and saved to cache in {time.perf_counter()-start:.3f}s')
@@ -88,9 +88,9 @@ SUMMARIZER_CONFIG = {
 
 # get models
 tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
-
-summarizer = None # declare here so we reference it in debug without errors
-if not DEBUG or False: # set to true to enable in debug
+# move this setup and the one in index.py to https://docs.djangoproject.com/en/4.0/ref/applications/#django.apps.AppConfig.ready
+summarizer = None  # declare here so we reference it in debug without errors
+if not DEBUG or False:  # set to true to enable in debug
     # use gpu if available
     if torch.cuda.is_available():
         logger.debug('Summarizer model is using GPU')
@@ -100,4 +100,4 @@ if not DEBUG or False: # set to true to enable in debug
         device = -1
 
     summarizer = pipeline('summarization', device=device, model=SUMMARIZER_CONFIG['MODEL_NAME'], tokenizer=tokenizer)
-    summarizer.model.resize_token_embeddings(len(tokenizer)) # https://github.com/huggingface/transformers/issues/4875
+    summarizer.model.resize_token_embeddings(len(tokenizer))  # https://github.com/huggingface/transformers/issues/4875

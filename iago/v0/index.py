@@ -5,9 +5,10 @@ from pathlib import Path
 import faiss
 import numpy as np
 from django.core.cache import cache
-from django.db.models import Q, Model
+from django.db.models import Model, Q
 from django.db.models.query import QuerySet
 from iago.settings import DEBUG
+from pathos.threading import ThreadPool
 from sentence_transformers import util
 
 from v0.ai import embedding_model
@@ -21,31 +22,28 @@ logger = logging.getLogger(__name__)
 class VectorIndex():
     """ Index class for semantic embedding and implementing vector search """
 
-    def __init__(self, iterable: QuerySet):
-        self.iterable = iterable
-        self.model: Model = iterable.model
-        if type(iterable) == QuerySet:
-            self.logger = logging.getLogger(f'v0.VectorIndex_{self.iterable.model.__name__}')
-        else:
-            self.logger = logging.getLogger(f'VectorIndex_Iterable')
+    def __init__(self, queryset: QuerySet, generate_index=True):
+        assert isinstance(queryset, QuerySet), 'VectorIndex only supports QuerySets'
+        e = queryset.count()
+        self.queryset = queryset
+        self.model: Model = self.queryset.model
+        self.logger = logging.getLogger(f'v0.VectorIndex_{self.queryset.model.__name__}')
         self.d = 768
-        self._generate_index()
+        if generate_index:
+            self._generate_index()
 
     def _generate_index(self):
-        """ generate the index using the literable """
+        """ Generate the FAISS IndexIDMap using the QuerySet """
         start = time.perf_counter()
         self.index = faiss.IndexIDMap(faiss.IndexFlatIP(self.d))  # dimensions of vectors
 
-        # either get or generate vectors
-        if type(self.iterable) == QuerySet:
-            # https://stackoverflow.com/questions/7558908/unpacking-a-list-tuple-of-pairs-into-two-lists-tuples
-            self.pks, self.vectors = zip(*list(self.iterable.values_list('pk', 'embedding_all_mpnet_base_v2')))
-            self.vectors = np.array(self.vectors).astype(np.float32)
-        else:
-            raise ValueError('VectorIndex supported for non-queryset iterables is deprecated')
+        # get vectors from the QuerySet
+        self.pks, self.vectors = zip(*list(self.queryset.values_list('pk', 'embedding_all_mpnet_base_v2')))
+        self.vectors = np.array(self.vectors).astype(np.float32)
 
+        # add vectors to the index
         self.index.add_with_ids(self.vectors, np.array(range(0, len(self.vectors))).astype(np.int64))
-        self.logger.info(f'Generated index with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
+        self.logger.info(f'Generated index for {self.queryset.model.__name__} with a total of {self.index.ntotal} vectors in {round(time.perf_counter()-start, 4)}s')
 
     def _min_distance(self, indices: list[int], min_distance: float):
         """ Returns the indices that are a provided minimum semantic distance from each other in a given list of indices
@@ -73,7 +71,7 @@ class VectorIndex():
         results_to_remove = set()
         for i, vector_results in enumerate(cosine_scores):
             for j, result in enumerate(vector_results):
-                if i not in results_to_remove and j not in results_to_remove and i != j and 1-result < min_distance : # don't compare to self, and dont compare to already removed results
+                if i not in results_to_remove and j not in results_to_remove and i != j and 1-result < min_distance:  # don't compare to self, and dont compare to already removed results
                     results_to_remove.add(j)
 
         # get indices in the global index of the results we want to keep
@@ -93,11 +91,12 @@ class VectorIndex():
             truncate_results (bool, optional): Whether to truncate the results to the top k. Defaults to True.
 
         Returns:
-            results: (QuerySet): List of tuples, object from self.iterable and its similarity to the query, in descending order or a queryset
-            rankings: (list): List of tuples, pk and similarity to the query pairs, in descending order
-            query_vector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray
+            results: (QuerySet): List of tuples, object from self.queryset and its similarity to the query, in descending order or a queryset.
+            rankings: (list): List of tuples, pk and similarity to the query pairs, in descending order.
+            query_vector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray.
         """
-        
+
+        assert self.index is not None, 'Index not generated'
         start = time.perf_counter()
 
         if type(query) == str:
@@ -113,7 +112,7 @@ class VectorIndex():
 
         assert np.isfinite(query_vector).all(), "Query vector contains NaN or Inf"
 
-        if min_distance > 0: # if we want to filter results then we must get extra results initially to satisfy k
+        if min_distance > 0:  # if we want to filter results then we must get extra results initially to satisfy k
             p = 10
         else:
             p = 1
@@ -129,12 +128,12 @@ class VectorIndex():
             values, indices = self.index.search(query_vector, k*p)
             # figure out if we need to run min_distance or not, do so if necessary, and get a list of results
             if min_distance > 0:
-                # so for clarity, cleaned indices is a list of i values corresponding to our parent iterable, our queryset, where results_to_remove is a list of i values that got removed from indices, which can be confusing because there are two lists of indices, one being the parent of the other essentially
+                # so for clarity, cleaned indices is a list of i values corresponding to our parent queryset, our queryset, where results_to_remove is a list of i values that got removed from indices, which can be confusing because there are two lists of indices, one being the parent of the other essentially
                 cleaned_indices, results_to_remove = self._min_distance(indices, min_distance)
                 # we need to keep values in the same order as cleaned_indices, so remove the values corresponding to the indices we removed
                 cleaned_values = [value for i, value in enumerate(values.tolist()[0]) if i not in results_to_remove]
             else:
-                cleaned_indices = indices.tolist()[0] # 0 because query_vector is a list of 1 element
+                cleaned_indices = indices.tolist()[0]  # 0 because query_vector is a list of 1 element
                 cleaned_values = values.tolist()[0]
             # store the results as a tuple of np.ndarrays, with the row index and its value (ranking) to be able to depickle and order easily later
             if use_cached:
@@ -144,22 +143,63 @@ class VectorIndex():
         if truncate_results:
             cleaned_indices = cleaned_indices[:k]
             cleaned_values = cleaned_values[:k]
-        
-        # the iterable could be sliced to ensure that we are using a new queryset to filter the results
-        results: QuerySet = self.iterable.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])
+
+        # the queryset could be sliced to ensure that we are using a new queryset to filter the results
+        results: QuerySet = self.queryset.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])
         rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, cleaned_values)]
         return results, rankings, query_vector
 
+
+# decleare VectorIndexes as global so we can access them throughout the app
 topic_index: VectorIndex
 skills_index: VectorIndex
 content_index: VectorIndex
 unsplash_photo_index: VectorIndex
 vodafone_index: VectorIndex
 jobs_index: VectorIndex
-if not DEBUG or False: # set to true to enable indexes in debug
-    topic_index = VectorIndex(Topic.objects.all())
-    jobs_index = VectorIndex(Job.objects.all())
-    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000])
-    vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'))
-    skills_index = VectorIndex(Skill.objects.all())
-content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200)))) # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
+
+
+def init_indexes(multithreaded=True):
+    """ 
+    Initialize the VectorIndexes for each model in parrallel
+    Each index is initiated by a QuerySet, some have filters, each QuerySet's model is a child of StringEmbedding
+    """
+    logger.info('Initializing indexes..')
+    start = time.perf_counter()
+
+    # we are updating the declared global indexes
+    global content_index
+    global topic_index
+    global jobs_index
+    global unsplash_photo_index
+    global vodafone_index
+    global skills_index
+
+    # Define the indexes but do not run the indexing yet
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))),
+                                False)  # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
+    topic_index = VectorIndex(Topic.objects.all(), False)
+    jobs_index = VectorIndex(Job.objects.all(), False)
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000], False)  # index only the first 30000 unsplash photos
+    vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'), False)  # index only vodafone content for demo purposes
+    skills_index = VectorIndex(Skill.objects.all(), False)
+
+    # Build lists so that we can initialize the indexes in parallel. Debug mode has a different list to make sure we only load what we need to debug, as this takes quite some time.
+    if not DEBUG:
+        index_globals = [content_index, topic_index, jobs_index, unsplash_photo_index, vodafone_index, skills_index]
+    else:
+        index_globals = [content_index, skills_index]
+
+    # build the indexes in parallel
+    if multithreaded:
+        with ThreadPool(processes=3) as pool:
+            pool.map(lambda x: x._generate_index(), index_globals)
+    else:
+        for index in index_globals:
+            index._generate_index()
+    logger.info(f'Indexes initialized in {time.perf_counter()-start:.3f}s!')
+
+
+def ready():
+    """ This function is called when the app is ready to be used. """
+    init_indexes(multithreaded=True)
