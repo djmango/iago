@@ -1,5 +1,6 @@
 beautifulsoup4~=4.10.0
 datasets
+matplotlib
 openpyxl
 python_hide_my_name
 requests-oauthlib

@@ -167,3 +167,4 @@ iago/scripts/data/
 .tmp/
 .pgsync.yml
 tesseract/
+*.xlsx
