@@ -188,13 +188,16 @@ def init_indexes(multithreaded=True):
     if not DEBUG:
         index_globals = [content_index, topic_index, jobs_index, unsplash_photo_index, vodafone_index, skills_index]
     else:
-        index_globals = [content_index, skills_index]
+        index_globals = []
 
     # build the indexes in parallel
-    if multithreaded:
+    if len(index_globals) == 0:
+        logger.info('No indexes to build')
+        return
+    elif multithreaded:
         with ThreadPool(processes=3) as pool:
             pool.map(lambda x: x._generate_index(), index_globals)
-    else:
+    else:  # TODO  technically this is reduntant, the False we have above after all the index definitions can be mapped to the inverse of multithreaded and that would be sufficient
         for index in index_globals:
             index._generate_index()
     logger.info(f'Indexes initialized in {time.perf_counter()-start:.3f}s!')

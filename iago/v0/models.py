@@ -205,13 +205,15 @@ class Content(models.Model):
     
     tags = models.JSONField(default=list)
     skills = models.ManyToManyField(Skill)
+    mindtools_skill_group = models.ForeignKey(MindtoolsSkillGroup, on_delete=models.SET_NULL, blank=True, null=True)
+    mindtools_skill_subgroup = models.ForeignKey(MindtoolsSkillSubgroup, on_delete=models.SET_NULL, blank=True, null=True)
     
     deleted = models.BooleanField(default=False)
     last_response = models.JSONField(default=dict)
     file = models.FileField(upload_to='content/', blank=True, null=True)
 
     # embeddings
-    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True) # TODO: make this non nullable
 
     def __str__(self):
         return str(self.title)
