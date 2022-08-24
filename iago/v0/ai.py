@@ -90,6 +90,7 @@ SUMMARIZER_CONFIG = {
 tokenizer = AutoTokenizer.from_pretrained(SUMMARIZER_CONFIG['MODEL_NAME'])
 # move this setup and the one in index.py to https://docs.djangoproject.com/en/4.0/ref/applications/#django.apps.AppConfig.ready
 summarizer = None  # declare here so we reference it in debug without errors
+# summarizer = transfor # TODO: declare this properly with type
 if not DEBUG or False:  # set to true to enable in debug
     # use gpu if available
     if torch.cuda.is_available():

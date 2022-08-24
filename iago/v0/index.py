@@ -176,12 +176,11 @@ def init_indexes(multithreaded=True):
     global skills_index
 
     # Define the indexes but do not run the indexing yet
-    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))),
-                                False)  # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
-    topic_index = VectorIndex(Topic.objects.all(), False)
-    jobs_index = VectorIndex(Job.objects.all(), False)
-    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000], False)  # index only the first 30000 unsplash photos
-    vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'), False)  # index only vodafone content for demo purposes
+    content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))), not multithreaded)  # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
+    topic_index = VectorIndex(Topic.objects.all(), not multithreaded)
+    jobs_index = VectorIndex(Job.objects.all(), not multithreaded)
+    unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000], not multithreaded)  # index only the first 30000 unsplash photos
+    vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'), not multithreaded)  # index only vodafone content for demo purposes
     skills_index = VectorIndex(Skill.objects.all(), False)
 
     # Build lists so that we can initialize the indexes in parallel. Debug mode has a different list to make sure we only load what we need to debug, as this takes quite some time.
@@ -197,9 +196,6 @@ def init_indexes(multithreaded=True):
     elif multithreaded:
         with ThreadPool(processes=3) as pool:
             pool.map(lambda x: x._generate_index(), index_globals)
-    else:  # TODO  technically this is reduntant, the False we have above after all the index definitions can be mapped to the inverse of multithreaded and that would be sufficient
-        for index in index_globals:
-            index._generate_index()
     logger.info(f'Indexes initialized in {time.perf_counter()-start:.3f}s!')
 
 

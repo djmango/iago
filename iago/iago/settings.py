@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'rest_framework.authtoken',
     'rest_framework',
+    'drf_spectacular',
 ]
 
 if DEBUG:
@@ -99,13 +100,19 @@ WSGI_APPLICATION = 'iago.wsgi.application'
 # auth
 # https://www.django-rest-framework.org/api-guide/authentication/
 REST_FRAMEWORK = {
-    # 'DEFAULT_AUTHENTICATION_CLASSES': [
-    #     'rest_framework.authentication.BasicAuthentication',
-    #     'rest_framework.authentication.SessionAuthentication',
-    # ]
-    # auth is now handled by API gateway
-    'DEFAULT_AUTHENTICATION_CLASSES': []
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+# Spectacular documentation settings
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Iago API Documentation',
+    'DESCRIPTION': 'Iago is the interface to Jeeny\'s brain',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
+}
+
 
 # extensions
 GRAPH_MODELS = {

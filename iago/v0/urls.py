@@ -30,9 +30,3 @@ urlpatterns = [
     path('skillspace/adjacent', views.skills_adjacent.as_view()),
     path('skillspace/match', views.skills_match.as_view()),
 ]
-
-# this file only runs once so its a good way to do init stuff, maybe not best practice tho 
-#TODO change to https://docs.djangoproject.com/en/3.2/ref/applications/#django.apps.AppConfig.ready
-if DEBUG:
-    logger.debug('i am the onceler')
-    logger.debug('i am the twiceler')
