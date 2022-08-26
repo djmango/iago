@@ -22,6 +22,10 @@ HERE = Path(__file__).parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('API_SECRET', 'debugkey')
 
+# * IAGO CONSTS *
+
+MODEL_VECTOR_SIZE = 768
+
 if not bool(int(os.getenv('PRODUCTION', '0'))):
     DEBUG = True
     print('DJANGO SETTINGS IN DEBUG')

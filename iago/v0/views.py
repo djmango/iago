@@ -7,16 +7,18 @@ import jsonschema
 import numpy as np
 from django.core.cache import cache
 from django.db import models
+from drf_spectacular.utils import extend_schema
 from iago.settings import DEBUG, LOGGING_LEVEL_MODULE
 from rest_framework import status, views
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.request import Request
 
-from v0 import ai, index, schemas
+from v0 import ai, index
 from v0.article import updateArticle
 from v0.models import Content, Job, Skill, Topic, HUMAN_TO_MODEL
 from v0.pdf import ingestContentPDF
+from v0.schemas import schemas_request, schemas_response
 from v0.serializers import fileUploadSerializer
 from v0.utils import allowedFile, is_valid_uuid, search_fuzzy_cache
 
@@ -34,7 +36,7 @@ class skills_match(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.texts)
+            jsonschema.validate(request.data, schema=schemas_request.texts)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -67,7 +69,7 @@ class skills_match_embeds(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.embeds)
+            jsonschema.validate(request.data, schema=schemas_request.embeds)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -94,7 +96,7 @@ class skills_adjacent(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.skills_adjacent)
+            jsonschema.validate(request.data, schema=schemas_request.skills_adjacent)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -147,7 +149,7 @@ class index_query(views.APIView):
 
     def post(self, request: Request, index_choice: str):
         try:
-            jsonschema.validate(request.data, schema=schemas.query_k_temperature_fields)
+            jsonschema.validate(request.data, schema=schemas_request.query_k_temperature_fields)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -204,7 +206,7 @@ class content_update(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.k)
+            jsonschema.validate(request.data, schema=schemas_request.k)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -268,7 +270,7 @@ class content_via_adjacent_skills(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.content_via_adjacent_skills)
+            jsonschema.validate(request.data, schema=schemas_request.content_via_adjacent_skills)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -344,7 +346,7 @@ class content_via_search(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.content_via_search)
+            jsonschema.validate(request.data, schema=schemas_request.content_via_search)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -435,7 +437,7 @@ class content_via_recommendation(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.content_via_recommendation)
+            jsonschema.validate(request.data, schema=schemas_request.content_via_recommendation)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -533,7 +535,7 @@ class content_via_title(views.APIView):
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.content_via_title)
+            jsonschema.validate(request.data, schema=schemas_request.content_via_title)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -675,7 +677,7 @@ class model_field_search(views.APIView):
 
     def post(self, request: Request, model_choice: str):
         try:
-            jsonschema.validate(request.data, schema=schemas.model_field_search)
+            jsonschema.validate(request.data, schema=schemas_request.model_field_search)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -730,10 +732,11 @@ class model_field_search(views.APIView):
 
 class transform(views.APIView):
     """ transform texts """
+    @extend_schema(responses={200: schemas_response.transform})
 
     def post(self, request: Request):
         try:
-            jsonschema.validate(request.data, schema=schemas.texts)
+            jsonschema.validate(request.data, schema=schemas_request.texts)
         except jsonschema.exceptions.ValidationError as err:
             return Response({'response': err.message, 'schema': err.schema}, status=status.HTTP_400_BAD_REQUEST)
 

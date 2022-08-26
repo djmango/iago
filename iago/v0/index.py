@@ -7,12 +7,12 @@ import numpy as np
 from django.core.cache import cache
 from django.db.models import Model, Q
 from django.db.models.query import QuerySet
-from iago.settings import DEBUG
+from iago.settings import DEBUG, MODEL_VECTOR_SIZE
 from pathos.threading import ThreadPool
 from sentence_transformers import util
 
 from v0.ai import embedding_model
-from v0.models import Content, Job, Skill, Topic, UnsplashPhoto
+from v0.models import Content, Job, MindtoolsSkillGroup, MindtoolsSkillSubgroup, Skill, Topic, UnsplashPhoto
 from v0.utils import generate_cache_key
 
 HERE = Path(__file__).parent
@@ -28,7 +28,7 @@ class VectorIndex():
         self.queryset = queryset
         self.model: Model = self.queryset.model
         self.logger = logging.getLogger(f'v0.VectorIndex_{self.queryset.model.__name__}')
-        self.d = 768
+        self.d = MODEL_VECTOR_SIZE
         if generate_index:
             self._generate_index()
 
@@ -80,11 +80,11 @@ class VectorIndex():
 
         return cleaned_indices, results_to_remove
 
-    def query(self, query: str | list | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True, truncate_results=True):
+    def query(self, query: str | list[float] | np.ndarray, k: int = 1, min_distance: float = 0.0, use_cached=True, truncate_results=True):
         """ Find closest k matches for a given query or vector using semantic embedding_model
 
         Args:
-            query (str, list, np.ndarray): The string or embedding vector to find closest matches for
+            query (str | list[float] | np.ndarray): The string, list of strings, or embed vector to find closest matches for
             k (int, optional): Number of results to return. Defaults to 1.
             min_distance (float, optional): Minimum distance between matches. Ranges from 0 to 1, 0 returning all results and 1 returning none. Defaults to 0.
             use_cached (bool, optional): Whether to use the cached vectors or not. Defaults to True.
@@ -101,14 +101,16 @@ class VectorIndex():
 
         if type(query) == str:
             query_vector = embedding_model.encode([query]).astype(np.float32)
+        # elif type(query) == list and all(type(x) == str for x in query):
+        #     query_vector = embedding_model.encode(query).astype(np.float32)
         elif type(query) == np.ndarray:
             query_vector = np.array([query]).astype(np.float32)
-        elif type(query) == list:
+        elif type(query) == list and all(type(x) == float for x in query):
             if len(query) != self.d:
                 raise ValueError(f'Query vector must be of length {self.d}')
             query_vector = np.array([query]).astype(np.float32)
         else:
-            raise ValueError('Query must be a str, list, or np.ndarray')
+            raise ValueError('Query must be a str, list[float], or np.ndarray')
 
         assert np.isfinite(query_vector).all(), "Query vector contains NaN or Inf"
 
@@ -157,7 +159,8 @@ content_index: VectorIndex
 unsplash_photo_index: VectorIndex
 vodafone_index: VectorIndex
 jobs_index: VectorIndex
-
+mindtools_skillgroup_index: VectorIndex
+mindtools_skillsubgroup_index: VectorIndex
 
 def init_indexes(multithreaded=True):
     """ 
@@ -174,6 +177,8 @@ def init_indexes(multithreaded=True):
     global unsplash_photo_index
     global vodafone_index
     global skills_index
+    global mindtools_skillgroup_index
+    global mindtools_skillsubgroup_index
 
     # Define the indexes but do not run the indexing yet
     content_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(~Q(provider='medium') | (Q(provider='medium') & Q(popularity__medium__totalClapCount__gt=200))), not multithreaded)  # index only content that has more than 200 likes - supposedly the  best 10% of content according to the numbers in our db
@@ -182,20 +187,22 @@ def init_indexes(multithreaded=True):
     unsplash_photo_index = VectorIndex(UnsplashPhoto.objects.exclude(embedding_all_mpnet_base_v2__isnull=True)[:30000], not multithreaded)  # index only the first 30000 unsplash photos
     vodafone_index = VectorIndex(Content.objects.exclude(embedding_all_mpnet_base_v2__isnull=True).filter(provider='vodafone'), not multithreaded)  # index only vodafone content for demo purposes
     skills_index = VectorIndex(Skill.objects.all(), False)
+    mindtools_skillgroup_index = VectorIndex(MindtoolsSkillGroup.objects.all(), False)
+    mindtools_skillsubgroup_index = VectorIndex(MindtoolsSkillSubgroup.objects.all(), False)
 
     # Build lists so that we can initialize the indexes in parallel. Debug mode has a different list to make sure we only load what we need to debug, as this takes quite some time.
     if not DEBUG:
-        index_globals = [content_index, topic_index, jobs_index, unsplash_photo_index, vodafone_index, skills_index]
+        indexes_to_build = [content_index, topic_index, jobs_index, unsplash_photo_index, vodafone_index, skills_index, mindtools_skillgroup_index, mindtools_skillsubgroup_index]
     else:
-        index_globals = []
+        indexes_to_build = []
 
     # build the indexes in parallel
-    if len(index_globals) == 0:
+    if len(indexes_to_build) == 0:
         logger.info('No indexes to build')
         return
     elif multithreaded:
         with ThreadPool(processes=3) as pool:
-            pool.map(lambda x: x._generate_index(), index_globals)
+            pool.map(lambda x: x._generate_index(), indexes_to_build)
     logger.info(f'Indexes initialized in {time.perf_counter()-start:.3f}s!')
 
 

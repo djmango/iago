@@ -1,3 +1,6 @@
+"""
+json-schemas for the request bodies of the API endpoints.
+"""
 from v0.models import Content
 
 k = {
@@ -7,6 +10,7 @@ k = {
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         }
     },
     "required": ["k"],
@@ -22,6 +26,7 @@ query_k = {
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         }
     },
     "required": ["query"],
@@ -37,6 +42,7 @@ query_k_temperature = {
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         },
         "temperature": {
             "type": "integer",
@@ -57,6 +63,7 @@ query_k_temperature_fields = {
         "k": {
             "type": "integer",
             "inclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         },
         "temperature": {
             "type": "integer",
@@ -85,8 +92,8 @@ model_field_search = {
         },
         "k": {
             "type": "integer",
-            "description": "The number of results to return",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         },
         "similarity_minimum": {
             "type": "integer",
@@ -215,8 +222,8 @@ content_via_search = {
         },
         "k": {
             "type": "integer",
-            "description": "The number of content pieces to return",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "description": "The number of results to return per page."
         },
         "page": {
             "type": "integer",
@@ -289,8 +296,8 @@ content_via_adjacent_skills = {
         },
         "k": {
             "type": "integer",
+            "exclusiveMinimum": 0,
             "description": "The number of content pieces to return",
-            "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",
@@ -335,8 +342,8 @@ content_via_recommendation = {
         },
         "k": {
             "type": "integer",
+            "exclusiveMinimum": 0,
             "description": "The number of recommendations to return",
-            "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",
@@ -443,8 +450,8 @@ content_via_title = {
         },
         "k": {
             "type": "integer",
+            "exclusiveMinimum": 0,
             "description": "The number of content pieces to return",
-            "exclusiveMinimum": 0
         },
         "page": {
             "type": "integer",

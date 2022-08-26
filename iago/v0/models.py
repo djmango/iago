@@ -4,7 +4,7 @@ import uuid
 import numpy as np
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from iago.settings import LOGGING_LEVEL_MODULE
+from iago.settings import LOGGING_LEVEL_MODULE, MODEL_VECTOR_SIZE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL_MODULE)
@@ -15,7 +15,7 @@ logger.setLevel(LOGGING_LEVEL_MODULE)
 class StringEmbedding(models.Model):
     """ Abstract class for string-embedding pairs """
     name = models.CharField(max_length=255, primary_key=True, editable=False)
-    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=MODEL_VECTOR_SIZE)
 
     def create(self, name: str, embedding: list | np.ndarray | None = None):
         """ Set name and generate embedding """
@@ -156,7 +156,7 @@ class UnsplashPhoto(models.Model):
     ai_primary_landmark_confidence = models.CharField(max_length=255, blank=True, null=True)
     blur_hash = models.CharField(max_length=255, blank=True, null=True)
     # new fields
-    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, null=True, blank=True)
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=MODEL_VECTOR_SIZE, null=True, blank=True)
 
     def __str__(self):
         return str(self.photo_url)
@@ -213,7 +213,7 @@ class Content(models.Model):
     file = models.FileField(upload_to='content/', blank=True, null=True)
 
     # embeddings
-    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=768, blank=True, null=True) # TODO: make this non nullable
+    embedding_all_mpnet_base_v2 = ArrayField(models.FloatField(), size=MODEL_VECTOR_SIZE, blank=True, null=True) # TODO: make this non nullable
 
     def __str__(self):
         return str(self.title)
