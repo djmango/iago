@@ -258,7 +258,7 @@ class content_file_upload(views.APIView):  # vodafone
                 content.author = 'iago_vodafone'
                 content.file = file
                 content.url = content.file.url
-                content.type = Content.types.pdf
+                content.type = Content.document_types.pdf
                 content.provider = Content.providers.vodafone
                 content.save()
                 responses.append({'filename': content.title, 'id': content.uuid})

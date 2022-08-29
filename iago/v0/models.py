@@ -174,7 +174,7 @@ class Content(models.Model):
         hbr = 'hbr'
         vodafone = 'vodafone'
 
-    class types(models.TextChoices):
+    class document_types(models.TextChoices):
         article = 'article'
         video = 'video'
         pdf = 'pdf'
@@ -197,7 +197,7 @@ class Content(models.Model):
     popularity = models.JSONField(default=dict)
     summary = models.JSONField(default=dict)
     provider = models.CharField(max_length=25, choices=providers.choices, default=providers.medium)
-    type = models.CharField(max_length=25, choices=types.choices, default=types.article)
+    type = models.CharField(max_length=25, choices=document_types.choices, default=document_types.article)
     
     created_on = models.DateTimeField(auto_now_add=True)
     updated_on = models.DateTimeField(auto_now=True)

@@ -124,11 +124,11 @@ class VectorIndex():
             p = 1
 
         # generate a unique deterministic string to cache the results
-        if use_cached:
-            cache_key = generate_cache_key(query_vector.tolist(), k*p, min_distance, version=1)
+        if use_cached: # It's important to include all the params that affect the results, otherwise we could cache incorrect results
+            cache_key = generate_cache_key(query_vector.tolist(), str(self.queryset.query), k*p, min_distance, version=2)
             cached_results = cache.get(cache_key)
 
-        if use_cached and cached_results:  # if we got results just depickle them
+        if use_cached and cached_results:  # if we got results unpack them
             cleaned_values, cleaned_indices = cached_results
         else:  # if not in cache, run the search and cache the results
             values, indices = self.index.search(query_vector, k*p)
@@ -151,7 +151,7 @@ class VectorIndex():
             cleaned_values = cleaned_values[:k]
 
         # the queryset could be sliced to ensure that we are using a new queryset to filter the results
-        results: QuerySet = self.queryset.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices])
+        results: QuerySet = self.queryset.model.objects.filter(pk__in=[self.pks[x] for x in cleaned_indices if x != -1]) # -1 is the value returned when there is no match because k is out of index bounds
         rankings = [(self.pks[indice], value) for indice, value in zip(cleaned_indices, cleaned_values)]
         return results, rankings, query_vector
 

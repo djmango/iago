@@ -24,7 +24,7 @@ def ingestContentPDF(content: Content):
         pages = convert_from_bytes(content.file.read())
         logger.debug(f'{content.title} is a valid pdf')
     except SyntaxWarning:
-        content.type = Content.types.invalid_file
+        content.type = Content.document_types.invalid_file
         content.save()
         logger.warning(f'{content.title} is an invalid pdf')
         return

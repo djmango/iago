@@ -54,7 +54,7 @@ for i, row in tqdm(df.iterrows(), total=df.shape[0]):
     content.author = repr(str(row['author']))[3:]
     content.url = row['article-href']
     content.provider = Content.providers.hbr
-    content.type = Content.types.article
+    content.type = Content.document_types.article
     content.content = row['content']
     if not pd.isnull(row['thumbnail-src']):
         content.thumbnail = 'https://hbr.org' + row['thumbnail-src']
