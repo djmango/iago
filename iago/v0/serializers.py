@@ -42,8 +42,8 @@ class CompareValues:
 
 class ItemsInSet:
     """ Validate that every value in a given list is within a base set. """
-    def __init__(self, base_set: set):
-        assert isinstance(base_set, set), 'base_set must be a set'
+    def __init__(self, base_set: set | list):
+        assert isinstance(base_set, (set, list)), 'base_set must be a set'
         self.base_set = base_set
 
     def __call__(self, value: list):
