@@ -186,15 +186,27 @@ class index_query(views.APIView):
         # do the actual search
         results, rankings, query_vector = query_index.query(query, k*(page+1), temperature)
         
-        results_pk_to_return_ranked = [x for x, score in rankings[page*k:(page+1)*k]]
+        results_pk_to_return_ranked, scores = zip(*[(x, score) for x, score in rankings[page*k:(page+1)*k]])
 
         # finally get the fields from the results that we want
         if fields == ['pk']: # no need to hit the db again if we just want the pks, also makes it so we dont need to rerank
             results_to_return = results_pk_to_return_ranked
         else: # otherwise return a list of dicts if we want multiple fields. means we also need to rank the results of the queryset since the database hit is unordered
             results_to_return = list(results.values(*fields))
-            # sort based on ranking
-            results_to_return = sorted(results_to_return, key=lambda result: results_pk_to_return_ranked.index(result['pk'])) 
+
+            # Sort based on ranking.
+            # One thing to note is that the results list is not ordered or offset/truncated, but the results_pk list is, 
+            # so a workaround to sorting the entire list which potentially could be really long based on the k and page value is to asssign -1
+            # to the pk of any results that are not in the results_pk_to_return_ranked list, which potentially are actually higher ranked but
+            # we don't want to return them because of the k/page value
+            results_to_return = sorted(results_to_return, key=lambda result: results_pk_to_return_ranked.index(result['pk']) if result['pk'] in results_pk_to_return_ranked else -1)
+
+            # Now that we have the results sorted, we can return the correct number and offset of results based on the page/k value
+            results_to_return = results_to_return[page*k:(page+1)*k]
+
+            # Annotate with score that we used to rank
+            for i, result in enumerate(results_to_return):
+                result['score'] = scores[i]
 
         return Response({'results': results_to_return, 'query_vector': query_vector}, status=status.HTTP_200_OK)
 
@@ -504,8 +516,8 @@ class content_via_recommendation(views.APIView):
         content_ids_to_return = list(content_to_return.values_list('uuid', flat=True))
 
         # build a ranked list of the content ids from the rankings provided by the indexer, which are already ordered by similarity to the recomendation center vector
-        content_ids_to_return_ranked = [x for x, score in rankings if x in content_ids_to_return]  # ensure the result passed our filters
-        scores = [score for x, score in rankings if x in content_ids_to_return]  # get the scores for the content ids to return
+        # ensure the result passed our filters and get the scores for the content ids to return
+        content_ids_to_return_ranked, scores = zip(*[(x, score) for x, score in rankings if x in content_ids_to_return])
 
         # slice the content_ids_to_return_ranked list to get the page we want
         content_ids_to_return_ranked = content_ids_to_return_ranked[page*k:(page+1)*k]

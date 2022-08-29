@@ -24,7 +24,6 @@ class VectorIndex():
 
     def __init__(self, queryset: QuerySet, generate_index=True):
         assert isinstance(queryset, QuerySet), 'VectorIndex only supports QuerySets'
-        e = queryset.count()
         self.queryset = queryset
         self.model: Model = self.queryset.model
         self.logger = logging.getLogger(f'v0.VectorIndex_{self.queryset.model.__name__}')
@@ -96,11 +95,16 @@ class VectorIndex():
             query_vector (np.ndarray): embedding of the submitted query if a query is a str instead of an np.ndarray.
         """
 
+        if not hasattr(self, 'index'):
+            logger.info(f'Index not generated for {self.queryset.model.__name__}, generating..')
+            self._generate_index()
+
+        # For redundancy, just to make sure the index truly did get generated
         assert self.index is not None, 'Index not generated'
-        start = time.perf_counter()
 
         if type(query) == str:
             query_vector = embedding_model.encode([query]).astype(np.float32)
+        # TODO: make this method able to handle multiple queries or make a new method for backwards compat
         # elif type(query) == list and all(type(x) == str for x in query):
         #     query_vector = embedding_model.encode(query).astype(np.float32)
         elif type(query) == np.ndarray:
@@ -197,8 +201,8 @@ def init_indexes(multithreaded=True):
         indexes_to_build = []
 
     # build the indexes in parallel
+    logger.info(f'{len(indexes_to_build)} indexes specified to be built at startup.')
     if len(indexes_to_build) == 0:
-        logger.info('No indexes to build')
         return
     elif multithreaded:
         with ThreadPool(processes=3) as pool:
