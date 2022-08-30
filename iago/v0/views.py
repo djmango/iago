@@ -357,7 +357,7 @@ class content_via_mindtools_skills(views.APIView):
     def post(self, request: Request):
         serializer = serializers.ContentRecommendationBySkillSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response({'response': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         # Required
         query_skills: list[str] = serializer.data['skills']
@@ -416,6 +416,7 @@ class content_via_mindtools_skills(views.APIView):
 
         # add the aux data and respond
         resp = {'results': results_total}
+        resp['for_humans'] = 'Results genereated via all_mpnet_base_v2 embeddings and FAISS Euclidean Semantic Similarity'
         return Response(resp, status=status.HTTP_200_OK)
 
 class content_via_search(views.APIView):
