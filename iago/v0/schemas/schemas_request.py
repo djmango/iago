@@ -197,7 +197,7 @@ content_via_search = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": vars(Content.document_types)["_member_names_"],
+                "enum": vars(Content.content_types)["_member_names_"],
             }
         },
         "provider": {
@@ -271,7 +271,7 @@ content_via_adjacent_skills = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": vars(Content.document_types)["_member_names_"],
+                "enum": vars(Content.content_types)["_member_names_"],
             }
         },
         "provider": {
@@ -356,7 +356,7 @@ content_via_recommendation = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": vars(Content.document_types)["_member_names_"],
+                "enum": vars(Content.content_types)["_member_names_"],
             }
         },
         "provider": {
@@ -425,7 +425,7 @@ content_via_title = {
             "uniqueItems": True,
             "items": {
                 "type": "string",
-                "enum": vars(Content.document_types)["_member_names_"],
+                "enum": vars(Content.content_types)["_member_names_"],
             }
         },
         "provider": {

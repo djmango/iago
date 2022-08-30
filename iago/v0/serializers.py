@@ -27,16 +27,16 @@ class CompareValues:
         assert isinstance(value, (int, float)), 'value must be an integer or float'
         if self.operator == Operator.GREATER_THAN:
             if not value > self.base_value:
-                raise serializers.ValidationError(f'{value} must be greater than {self.base_value}')
+                raise serializers.ValidationError(f'Value ({value}) must be greater than {self.base_value}')
         elif self.operator == Operator.LESS_THAN:
             if not value < self.base_value:
-                raise serializers.ValidationError(f'{value} must be less than {self.base_value}')
+                raise serializers.ValidationError(f'Value ({value}) must be less than {self.base_value}')
         elif self.operator == Operator.GREATER_THAN_OR_EQUAL_TO:
             if not value >= self.base_value:
-                raise serializers.ValidationError(f'{value} must be greater than or equal to {self.base_value}')
+                raise serializers.ValidationError(f'Value ({value}) must be greater than or equal to {self.base_value}')
         elif self.operator == Operator.LESS_THAN_OR_EQUAL_TO:
             if value <= self.base_value:
-                raise serializers.ValidationError(f'{value} must be less than or equal to {self.base_value}')
+                raise serializers.ValidationError(f'Value ({value}) must be less than or equal to {self.base_value}')
 
         return value
 
@@ -69,7 +69,7 @@ class FieldsInModel:
 
         # validate requested return fields
         if any(x not in self.model_fields for x in requested_fields):
-            raise serializers.ValidationError(f'{self.model.__name__} does not have the following fields: {[x for x in requested_fields if x not in self.model_fields]}\nAvailable fields: {self.model_fields}')
+            raise serializers.ValidationError(f'{self.model.__name__} does not have the following fields: {[x for x in requested_fields if x not in self.model_fields]} | Available fields: {self.model_fields}')
 
         if not 'pk' in requested_fields: # pk is always returned, might move this behavior to views later
             requested_fields.append('pk')
@@ -77,12 +77,7 @@ class FieldsInModel:
         return requested_fields
 
 # * Reusable fields
-k = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN, 0)])
-page = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN_OR_EQUAL_TO, 0)])
-query = serializers.CharField()
-temperature = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN_OR_EQUAL_TO, 0), CompareValues(Operator.LESS_THAN_OR_EQUAL_TO, 100)])
-provider = serializers.ListField(child=serializers.CharField(), validators=[ItemsInSet(Content.providers.names)])
-document_type = serializers.ListField(child=serializers.CharField(), validators=[ItemsInSet(Content.document_types.names)])
+# temperature = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN_OR_EQUAL_TO, 0), CompareValues(Operator.LESS_THAN_OR_EQUAL_TO, 100)])
 
 # * Serializers
 class fileUploadSerializer(serializers.Serializer):
@@ -90,15 +85,9 @@ class fileUploadSerializer(serializers.Serializer):
 
 class ContentRecommendationBySkillSerializer(serializers.Serializer):
     skills = serializers.ListField(child=serializers.CharField())
-    k = k
-    page = page
-    fields = serializers.ListField(child=serializers.CharField(), validators=[FieldsInModel()])
-    provider = provider
-    document_type = document_type
-    individual_skill_recommendations = serializers.BooleanField(default=False)
-    
-    # Requirements, by default fields are required
-    k.required = False
-    page.required = False
-    provider.required = False
-    document_type.required = False
+    fields = serializers.ListField(child=serializers.CharField(), validators=[FieldsInModel(Content)], default=['pk'])
+    k = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN, 0)], default=10)
+    page = serializers.IntegerField(validators=[CompareValues(Operator.GREATER_THAN_OR_EQUAL_TO, 0)], default=0)
+    provider = serializers.ListField(child=serializers.CharField(), validators=[ItemsInSet(Content.providers.names)], required=False)
+    content_type = serializers.ListField(child=serializers.CharField(), validators=[ItemsInSet(Content.content_types.names)], required=False)
+    individual_skill_recommendations = serializers.BooleanField(default=True)

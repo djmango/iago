@@ -15,8 +15,9 @@ from rest_framework.response import Response
 from rest_framework.request import Request
 
 from v0 import ai, index
+from v0 import serializers
 from v0.article import updateArticle
-from v0.models import Content, Job, Skill, Topic, HUMAN_TO_MODEL
+from v0.models import Content, Job, MindtoolsSkillGroup, Skill, Topic, HUMAN_TO_MODEL
 from v0.pdf import ingestContentPDF
 from v0.schemas import schemas_request, schemas_response
 from v0.serializers import fileUploadSerializer
@@ -258,7 +259,7 @@ class content_file_upload(views.APIView):  # vodafone
                 content.author = 'iago_vodafone'
                 content.file = file
                 content.url = content.file.url
-                content.type = Content.document_types.pdf
+                content.type = Content.content_types.pdf
                 content.provider = Content.providers.vodafone
                 content.save()
                 responses.append({'filename': content.title, 'id': content.uuid})
@@ -349,6 +350,73 @@ class content_via_adjacent_skills(views.APIView):
         resp['adjacent_skills'] = adjacent_skills_dict
         return Response(resp, status=status.HTTP_200_OK)
 
+
+class content_via_mindtools_skills(views.APIView):
+    """ Semantic search for content based on skills """
+    
+    def post(self, request: Request):
+        serializer = serializers.ContentRecommendationBySkillSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'response': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Required
+        query_skills: list[str] = serializer.data['skills']
+        k: int = serializer.data['k']
+        page: int = serializer.data['page']
+        fields: list[str] = serializer.data['fields']
+        individual_skill_recommendations: bool = serializer.data['individual_skill_recommendations']
+        # Optional
+        content_type: list | None = serializer.data.get('content_type')
+        provider: list | None = serializer.data.get('provider')
+
+        skills = [search_fuzzy_cache(MindtoolsSkillGroup, x, force_result=True)[0].first() for x in query_skills]
+        skills = [x for x in skills if x]  # remove nones
+
+        if len(skills) == 0:
+            return Response({'response': f'No skills found'}, status=status.HTTP_200_OK)
+
+        if individual_skill_recommendations:
+            query_vectors = [(x.name, x.embedding_all_mpnet_base_v2) for x in skills]
+        else:
+            average = np.mean([x.embedding_all_mpnet_base_v2 for x in skills], axis=0).astype(np.float32)
+            query_vectors = [('all_skills', average)]
+
+        # Get semantic search results for each query vector
+        results_total = []
+        for skill_name, query_vector in query_vectors:
+            results, rankings, query_vector = index.content_index.query(query_vector, k=k*(page+1)*10) # multiply by 10 to get more results so that we can hopefully match k results after filtering - not the best solution but fine for now
+            # unpack the rankings and make a ranked list of pks and a ranked list of scores
+            skills_ranked, scores_ranked = list(zip(*rankings))
+
+            # get the content ids for the ranked skills
+            results_to_return = Content.objects.filter(uuid__in=skills_ranked)
+
+            # apply filters to queryset
+            if content_type:
+                results_to_return = results_to_return.filter(type__in=content_type)
+            if provider:
+                results_to_return = results_to_return.filter(provider__in=provider)
+            results_to_return = results_to_return.distinct('uuid')
+
+            # Perform the transaction and get the fields we want
+            results_to_return_data = list(results_to_return.values(*fields))
+
+            # Rank the results by score
+            results_to_return_data = sorted(results_to_return_data, key=lambda result: skills_ranked.index(result['pk']))
+
+            # Slice the final list to get the page we want
+            results_to_return_data = results_to_return_data[page*k:(page+1)*k]
+
+            # Annotate each with the score
+            for result in results_to_return_data:
+                result['score'] = scores_ranked[skills_ranked.index(result['pk'])]
+
+            # Add the results to the total results list
+            results_total.append({'query': skill_name, 'count': len(results_to_return_data), 'content': results_to_return_data})
+
+        # add the aux data and respond
+        resp = {'results': results_total}
+        return Response(resp, status=status.HTTP_200_OK)
 
 class content_via_search(views.APIView):
     """ search for content based on skills """

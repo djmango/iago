@@ -12,6 +12,7 @@ urlpatterns = [
     path('cache/clear', views.cache_clear.as_view()),
     path('content/adjacent_to_skills', views.content_via_adjacent_skills.as_view()),
     path('content/recommend', views.content_via_recommendation.as_view()),
+    path('content/mindtools_skill', views.content_via_mindtools_skills.as_view()),
     path('content/search', views.content_via_search.as_view()),
     path('content/update', views.content_update.as_view()),
     path('content/search_title', views.content_via_title.as_view()),
