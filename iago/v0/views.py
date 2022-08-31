@@ -351,14 +351,22 @@ class content_via_adjacent_skills(views.APIView):
         return Response(resp, status=status.HTTP_200_OK)
 
 
-class content_via_mindtools_skills(views.APIView):
+class content_via_skills(views.APIView):
     """ Semantic search for content based on skills """
     
-    def post(self, request: Request):
+    def post(self, request: Request, skill_group: str):
         serializer = serializers.ContentRecommendationBySkillSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        # Validate skill group
+        if skill_group == 'mindtools':
+            skill_group_model = MindtoolsSkillGroup
+        elif skill_group == 'all':
+            skill_group_model = Skill
+        else:
+            return Response({'response': f'Invalid skill group {skill_group}. Valid: mindtools, all'}, status=status.HTTP_400_BAD_REQUEST)
+
         # Required
         query_skills: list[str] = serializer.data['skills']
         k: int = serializer.data['k']
@@ -369,7 +377,7 @@ class content_via_mindtools_skills(views.APIView):
         content_type: list | None = serializer.data.get('content_type')
         provider: list | None = serializer.data.get('provider')
 
-        skills = [search_fuzzy_cache(MindtoolsSkillGroup, x, force_result=True)[0].first() for x in query_skills]
+        skills = [search_fuzzy_cache(skill_group_model, x, force_result=True)[0].first() for x in query_skills]
         skills = [x for x in skills if x]  # remove nones
 
         if len(skills) == 0:
