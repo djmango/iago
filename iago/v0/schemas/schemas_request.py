@@ -95,12 +95,6 @@ model_field_search = {
             "exclusiveMinimum": 0,
             "description": "The number of results to return per page."
         },
-        "similarity_minimum": {
-            "type": "integer",
-            "description": "The minimum similarity between the query and the results",
-            "exclusiveMinimum": 0,
-            "inclusiveMaximum": 100
-        },
         "fields": {
             "type": "array",
             "description": "The fields to return",

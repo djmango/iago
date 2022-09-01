@@ -239,27 +239,29 @@ def generate_cache_key(*args, **kwargs):
     return str(get_hash((args, kwargs)).hex())
 
 
-def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0.7, use_cached=True, force_result=False, search_field='pk'):
+def search_fuzzy_cache(model: models.Model, name: str, k=1, use_cached=True, search_field='pk', queryset=None):
     """ Gets closest queryset object to the given name
 
     Args:
         model (django.db.models.Model): Model type to search
         name (str): Name to find closest match to
         k (int): Max number of results to return
-        similarity_minimum (float): Minimum similarity (max 1)
         use_cashed (bool, optional): Allow pulling a search result from cache, defaults to True
-        force_result (bool, optional): Force a search result via recursive deduction of the similarity_minimum, defaults to False
-        field_name (str, optional): Fieldname to perform the search on for, defaults to 'name'
+        search_field (str, optional): Fieldname to perform the search on for, defaults to 'pk'
+        queryset (django.db.models.QuerySet, optional): QuerySet to search within, use for prefiltering, defaults to None (model.objects.all())
     Returns:
-        QuerySet: K Closest matched instances, from cache if available
+        QuerySet: K closest matched instances, from cache if available
         List: Pks of closest matched instances ordered by similarity
     """
 
-    # TODO make option to pass in a queryset to allow for pre filtering
+    assert isinstance(queryset, models.query.QuerySet) or queryset is None, 'queryset must be a QuerySet or None'
+    if queryset is None:
+        logger.debug(f'No queryset provided, using {model.__name__}.objects.all()')
+        queryset = model.objects.all()
+    assert isinstance(queryset.model, type(model)), 'queryset must be of the same model type as model param'
 
     # check if available in cache first
-    start = time.perf_counter()
-    cache_key = generate_cache_key(str(model._meta).lower(), name, k, similarity_minimum, force_result, search_field, version=3)  # change version every time you modify this line
+    cache_key = generate_cache_key(str(model._meta).lower(), name, k, search_field, str(queryset.query), version=8)  # change version every time you modify this line
     cached_results = cache.get(cache_key)
     if use_cached and cached_results and type(cached_results) == tuple:  # if so do a simple pk lookup
         results, results_pk = cached_results  # unpack tuple
@@ -268,11 +270,8 @@ def search_fuzzy_cache(model: models.Model, name: str, k=1, similarity_minimum=0
         # so we have to force the execution now
         # and then cache a queryset thats just filtering for the resulting pks
         # otherwise we cache a trigram similarity query which is much slower to execute
-        results_pk = list(model.objects.annotate(similarity=TrigramSimilarity(search_field, name)).filter(similarity__gte=similarity_minimum).order_by('-similarity')[:k].values_list('pk', flat=True))
-        results = model.objects.filter(pk__in=results_pk)
+        results_pk = list(queryset.annotate(similarity=TrigramSimilarity(search_field, name)).order_by('-similarity')[:k].values_list('pk', flat=True))
+        results = model.objects.filter(pk__in=results_pk) # We can't use our prefiltered queryset here because it's sliced and we can't filter a sliced queryset
         cache.set(cache_key, (results, results_pk), timeout=60*60*24*2)  # 2 day timeout
-
-    if len(results_pk) < k and force_result:  # if we want to force a result, reduce the similarity minimum and call self again
-        return search_fuzzy_cache(model, name, k, similarity_minimum*0.7, use_cached=use_cached, force_result=True, search_field=search_field)
 
     return results, results_pk

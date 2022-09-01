@@ -377,7 +377,7 @@ class content_via_skills(views.APIView):
         content_type: list | None = serializer.data.get('content_type')
         provider: list | None = serializer.data.get('provider')
 
-        skills = [search_fuzzy_cache(skill_group_model, x, force_result=True)[0].first() for x in query_skills]
+        skills = [search_fuzzy_cache(skill_group_model, x)[0].first() for x in query_skills]
         skills = [x for x in skills if x]  # remove nones
 
         if len(skills) == 0:
@@ -532,7 +532,7 @@ class content_via_recommendation(views.APIView):
 
         # first match the free-form job title provided to one embedded in our database
         position: str = request.data['position']
-        job: Job = search_fuzzy_cache(Job, position, force_result=True)[0].first()
+        job: Job = search_fuzzy_cache(Job, position)[0].first()
         if job is None:
             return Response({'response': 'No matching job title found'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -632,13 +632,13 @@ class content_via_title(views.APIView):
         k: int = request.data.get('k')
         page: int = request.data.get('page', 0)  # default to 0
 
-        # get the closest k content to the query via our fuzzy search
-        content_to_return, rankings = search_fuzzy_cache(Content, query, k=int(k*(page+1)), force_result=True, search_field='title')
-
-        # apply filters
+        # apply filters before search to ensure we dont return less content than requested (which would potentially occur if we filter after search)
         content_type = request.data.get('type')
         length = request.data.get('length')
         provider = request.data.get('provider')
+
+        content_to_return = Content.objects.all()
+
         # type filter
         if content_type:
             content_to_return = content_to_return.filter(type__in=content_type)
@@ -651,6 +651,9 @@ class content_via_title(views.APIView):
         if provider:
             content_to_return = content_to_return.filter(provider__in=provider)
 
+        # get the closest k content to the query via our fuzzy search
+        content_to_return, rankings = search_fuzzy_cache(Content, query, k=int(k*(page+1)), search_field='title', queryset=content_to_return)
+        
         # unique filter
         content_to_return = content_to_return.distinct('uuid')
 
@@ -675,6 +678,8 @@ class content_via_title(views.APIView):
         else:
             resp = {'content': content_ids_to_return_ranked}
 
+        # add the aux data and respond
+        resp['count'] = len(content_ids_to_return_ranked)
         return Response(resp, status=status.HTTP_200_OK)
 
 
@@ -772,7 +777,6 @@ class model_field_search(views.APIView):
 
         query = str(request.data['query'])
         k = int(request.data['k'])
-        similarity_minimum = float(request.data.get('similarity_minimum', 30)/100)
 
         model: models.Model = HUMAN_TO_MODEL[model_choice]
         model_fields = ['pk'] + [x.name for x in model._meta.get_fields()]
@@ -803,7 +807,7 @@ class model_field_search(views.APIView):
             return Response(f'{model_choice} field {search_field} is not a string field', status=status.HTTP_400_BAD_REQUEST)
 
         # perform the search
-        results, results_pk = search_fuzzy_cache(model, query, k, similarity_minimum, search_field=search_field)
+        results, results_pk = search_fuzzy_cache(model, query, k, search_field=search_field)
 
         # finally get the fields we want
         if fields == ['pk']: # no need to hit the db again if we just want the pks
